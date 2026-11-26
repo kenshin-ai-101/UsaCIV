@@ -1,0 +1,220 @@
+# All 31 official public U.S. data sources for Terra Americana
+# Every source is fetched solely from documented official open APIs / direct public downloads.
+sources:
+  - id: census_boundaries
+    category: geo
+    title: "Cartographic Boundary Files (States & Counties, 1:20M)"
+    publisher: "U.S. Census Bureau"
+    homepage: "https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html"
+    license: "U.S. Government Public Domain"
+    used_for: "County-to-25km hex spatial crosswalk and state/county borders (CONUS, AK, HI)"
+  - id: census_gazetteer
+    category: geo
+    title: "Gazetteer Files (Metro Areas, Counties, Places)"
+    publisher: "U.S. Census Bureau"
+    homepage: "https://www.census.gov/geographies/reference-files/time-series/geo/gazetteer-files.html"
+    license: "U.S. Government Public Domain"
+    used_for: "Authoritative land/water areas and internal points for counties and CBSAs"
+  - id: cbsa_delineation
+    category: geo
+    title: "Core Based Statistical Area (CBSA) Delineation Files"
+    publisher: "U.S. Census Bureau / Office of Management and Budget (Bulletin 23-01)"
+    homepage: "https://www.census.gov/geographies/reference-files/time-series/demo/metro-micro/delineation-files.html"
+    license: "U.S. Government Public Domain"
+    used_for: "Official county-to-metropolitan/micropolitan area definitions (524+ cities)"
+  - id: etopo
+    category: geo
+    title: "ETOPO1 / ETOPO 2022 Global Relief Model"
+    publisher: "NOAA National Centers for Environmental Information (NCEI)"
+    homepage: "https://www.ncei.noaa.gov/products/etopo-global-relief-model"
+    license: "U.S. Government Public Domain"
+    used_for: "Hex elevation, relief tiers (flat/hills/mountains), and 2.5D physical extrusion height"
+  - id: nlcd
+    category: geo
+    title: "National Land Cover Database (NLCD CONUS / AK / HI)"
+    publisher: "U.S. Geological Survey (USGS) / MRLC Consortium"
+    homepage: "https://www.mrlc.gov/data/nlcd-2021-land-cover-conus"
+    license: "U.S. Government Public Domain"
+    used_for: "Biome classification, fractional forest/farmland/developed land cover, and 3 Land lenses"
+  - id: natural_earth
+    category: geo
+    title: "Natural Earth 1:50m (Countries, Lakes, Rivers)"
+    publisher: "Natural Earth"
+    homepage: "https://www.naturalearthdata.com/"
+    license: "Public Domain"
+    used_for: "Coastlines, Great Lakes, major river networks (Fresh Water bonus), neighboring land context"
+  - id: acs_1yr
+    category: people
+    title: "American Community Survey (ACS) 1-Year Estimates"
+    publisher: "U.S. Census Bureau"
+    homepage: "https://www.census.gov/programs-surveys/acs"
+    license: "U.S. Government Public Domain"
+    used_for: "524 metro/micropolitan city metrics, occupation workforce (16-Meeple Citizens), resident industries"
+  - id: acs_5yr
+    category: people
+    title: "American Community Survey (ACS) 5-Year Estimates (Counties)"
+    publisher: "U.S. Census Bureau"
+    homepage: "https://www.census.gov/programs-surveys/acs"
+    license: "U.S. Government Public Domain"
+    used_for: "12 hex lenses (density, income, home value, poverty, age, foreign-born, degrees, broadband, commute, homeownership, uninsured, veterans) & county explorer"
+  - id: pep_population
+    category: people
+    title: "Population Estimates Program (PEP) Vintage Series"
+    publisher: "U.S. Census Bureau"
+    homepage: "https://www.census.gov/programs-surveys/popest.html"
+    license: "U.S. Government Public Domain"
+    used_for: "County & state multi-year population growth, natural change, domestic & international migration"
+  - id: cdc_places
+    category: people
+    title: "PLACES: Local Data for Better Health (County Data)"
+    publisher: "Centers for Disease Control and Prevention (CDC)"
+    homepage: "https://www.cdc.gov/places/"
+    license: "U.S. Government Public Domain"
+    used_for: "Wellbeing / Amenities index (4 age-adjusted adult physical & mental health measures)"
+  - id: usrc_2020
+    category: people
+    title: "2020 U.S. Religion Census: County File (RCMSCY20)"
+    publisher: "ASARB via Association of Religion Data Archives (ARDA)"
+    homepage: "https://www.thearda.com/data-archive?fid=RCMSCY20"
+    license: "Public Research Data (Attribution Required)"
+    used_for: "Faith yield, Faith adherents lens, Largest Religious Tradition lens, Culture advisor"
+  - id: bea_gdp
+    category: economy
+    title: "GDP by County and Industry (CAGDP2)"
+    publisher: "U.S. Bureau of Economic Analysis (BEA)"
+    homepage: "https://apps.bea.gov/regional/downloadzip.htm"
+    license: "U.S. Government Public Domain"
+    used_for: "Gold yield (real GDP), metro & county GDP totals, industry composition for Economy advisor"
+  - id: bls_qcew
+    category: economy
+    title: "Quarterly Census of Employment and Wages (QCEW Annual Averages)"
+    publisher: "U.S. Bureau of Labor Statistics (BLS)"
+    homepage: "https://www.bls.gov/cew/"
+    license: "U.S. Government Public Domain"
+    used_for: "Industry Location Quotients (LQ) driving specialized city Districts (San Jose Campus, Detroit Auto Foundry, etc.)"
+  - id: natural_earth_roads
+    category: economy
+    title: "Natural Earth 1:10m Roads and Railroads"
+    publisher: "Natural Earth"
+    homepage: "https://www.naturalearthdata.com/"
+    license: "Public Domain"
+    used_for: "Interstate highways and main/secondary railroad network map art layers"
+  - id: usace_ports
+    category: economy
+    title: "Principal Ports of the United States (Cargo Tonnage)"
+    publisher: "U.S. Army Corps of Engineers (via BTS NTAD)"
+    homepage: "https://doi.org/10.21949/1529073"
+    license: "U.S. Government Public Domain"
+    used_for: "Maritime Harbor hubs, cargo tonnage rankings, Commerce advisor"
+  - id: faa_airports
+    category: economy
+    title: "FAA Passenger Enplanements, All-Cargo & NASR Locations"
+    publisher: "Federal Aviation Administration (FAA) & BTS NTAD"
+    homepage: "https://www.faa.gov/airports/planning_capacity/passenger_allcargo_stats/passenger"
+    license: "U.S. Government Public Domain"
+    used_for: "Aero-Hub icons, passenger/cargo throughput rankings, Commerce advisor"
+  - id: faf5
+    category: economy
+    title: "Freight Analysis Framework (FAF5 Regional Database)"
+    publisher: "FHWA & Bureau of Transportation Statistics (ORNL)"
+    homepage: "https://faf.ornl.gov/faf5/"
+    license: "U.S. Government Public Domain"
+    used_for: "Top interstate freight trade routes (value, tonnage, mode, commodity) & Commerce advisor"
+  - id: eia_860m
+    category: energy
+    title: "Preliminary Monthly Electric Generator Inventory (EIA-860M)"
+    publisher: "U.S. Energy Information Administration (EIA)"
+    homepage: "https://www.eia.gov/electricity/data/eia860m/"
+    license: "U.S. Government Public Domain"
+    used_for: "Power plant diamond beacons (nuclear, solar, wind, hydro, gas, coal, storage), MW capacity & Energy advisor"
+  - id: eia_coal
+    category: energy
+    title: "Historical Detailed Coal Production Data (Mine Level)"
+    publisher: "U.S. Energy Information Administration (EIA) / MSHA"
+    homepage: "https://www.eia.gov/coal/data.php"
+    license: "U.S. Government Public Domain"
+    used_for: "Coal strategic resource tonnage rankings and Energy advisor"
+  - id: eia_shale_plays
+    category: energy
+    title: "Tight Oil and Shale Gas Plays, Lower 48 States"
+    publisher: "U.S. Energy Information Administration (U.S. Energy Atlas)"
+    homepage: "https://atlas.eia.gov/datasets/eia::tight-oil-and-shale-gas-plays-lower-48-states"
+    license: "U.S. Government Public Domain"
+    used_for: "Geological stipple strata overlay for oil & natural gas basins (Permian, Bakken, Marcellus, etc.)"
+  - id: msha_mines
+    category: energy
+    title: "MSHA Mines Open Government Data Set"
+    publisher: "U.S. Department of Labor, Mine Safety and Health Administration"
+    homepage: "https://arlweb.msha.gov/OpenGovernmentData/OGIMSHA.asp"
+    license: "U.S. Government Public Domain"
+    used_for: "Metal & non-metal mineral ore prisms (gold, copper, iron, lithium, aggregates)"
+  - id: herd
+    category: wonders
+    title: "Higher Education Research and Development (HERD) Survey"
+    publisher: "National Science Foundation (NSF NCSES)"
+    homepage: "https://ncses.nsf.gov/explore-data/microdata/higher-education-research-development"
+    license: "U.S. Government Public Domain"
+    used_for: "Science yield & open-rule ranking of Academic Wonders by R&D expenditure"
+  - id: ipeds
+    category: wonders
+    title: "IPEDS Institutional Directory (HD) & 12-Month Enrollment (DRVEF12)"
+    publisher: "U.S. Department of Education (NCES)"
+    homepage: "https://nces.ed.gov/ipeds/datacenter/DataFiles.aspx"
+    license: "U.S. Government Public Domain"
+    used_for: "University coordinates, student enrollment, Campus district placement"
+  - id: nps_boundaries
+    category: wonders
+    title: "NPS Land Resources Division Boundaries"
+    publisher: "U.S. National Park Service (NPS)"
+    homepage: "https://www.arcgis.com/home/item.html?id=c8d60ffcbf5c4030a17762fe10e81c6a"
+    license: "U.S. Government Public Domain"
+    used_for: "Protected park footprints and Natural Wonder coordinates"
+  - id: nps_visits
+    category: wonders
+    title: "NPS Visitor Use Statistics (Recreation Visits)"
+    publisher: "U.S. National Park Service (IRMA)"
+    homepage: "https://irma.nps.gov/Stats/"
+    license: "U.S. Government Public Domain"
+    used_for: "Open-rule ranking of Natural Wonders by annual recreation visits & Culture yield"
+  - id: nhl_landmarks
+    category: wonders
+    title: "National Historic Landmarks (NRHP GIS Locations)"
+    publisher: "U.S. National Park Service (Cultural Resources GIS)"
+    homepage: "https://www.nps.gov/subjects/nationalhistoriclandmarks/index.htm"
+    license: "U.S. Government Public Domain"
+    used_for: "Heritage Wonders and iconic national landmark stamps"
+  - id: mirta
+    category: military
+    title: "Military Installations, Ranges and Training Areas (MIRTA)"
+    publisher: "U.S. Department of Defense (OASD EI&E DISDI)"
+    homepage: "https://www.acq.osd.mil/eie/imr/rpid/disdi/"
+    license: "U.S. Government Public Domain"
+    used_for: "Military Bastions/Forts, restricted range tiles, Encampment city districts"
+  - id: dmdc_personnel
+    category: military
+    title: "Military and DoD Civilian Personnel by Duty State and Service"
+    publisher: "U.S. Department of Defense, DMDC"
+    homepage: "https://dwp.dmdc.osd.mil/dwp/app/dod-data-reports/workforce-reports"
+    license: "U.S. Government Public Domain"
+    used_for: "Active-duty, reserve & civilian defense headcount by state & branch (Military advisor)"
+  - id: oldcc_spending
+    category: military
+    title: "Defense Spending by State"
+    publisher: "U.S. Department of Defense (OLDCC)"
+    homepage: "https://oldcc.gov/defense-spending-state-fiscal-year-2024"
+    license: "U.S. Government Public Domain"
+    used_for: "Defense contract & payroll spending by state (Military advisor)"
+  - id: fema_declarations
+    category: hazards
+    title: "OpenFEMA Disaster Declarations Summaries (v2)"
+    publisher: "Federal Emergency Management Agency (FEMA)"
+    homepage: "https://www.fema.gov/openfema-data-page/disaster-declarations-summaries-v2"
+    license: "U.S. Government Public Domain"
+    used_for: "Disasters hex lens (county major DR count since 2000) & hazard breakdown"
+  - id: noaa_billions
+    category: hazards
+    title: "U.S. Billion-Dollar Weather and Climate Disasters (1980-2024)"
+    publisher: "NOAA National Centers for Environmental Information (NCEI)"
+    homepage: "https://www.ncei.noaa.gov/access/billions/"
+    license: "U.S. Government Public Domain"
+    used_for: "National & state catastrophic weather cost timeline (Culture & Hazards advisor)"

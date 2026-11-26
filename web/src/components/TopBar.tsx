@@ -1,0 +1,419 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  BookOpen,
+  Camera as CameraIcon,
+  HelpCircle,
+  Landmark,
+  Moon,
+  Scale,
+  Search,
+  Share2,
+  Sun,
+  X,
+} from 'lucide-react';
+import { useAppStore, type TopMetricId } from '../store/useAppStore';
+import { TopMetricPopover } from './TopMetricPopover';
+import type { CityRecord, MapLayersData, StateRecord, WorldHexData, WorldMeta } from '../types/world';
+
+interface TopBarProps {
+  meta: WorldMeta;
+  world: WorldHexData;
+  cities: CityRecord[];
+  states: StateRecord[];
+  layersData: MapLayersData | null;
+  onFlyTo: (x: number, y: number, scale: number) => void;
+  onResetView: () => void;
+  onExportPng: () => void;
+  onCopyShareLink: () => void;
+}
+
+export const TopBar: React.FC<TopBarProps> = ({
+  meta,
+  world,
+  cities,
+  states,
+  layersData,
+  onFlyTo,
+  onResetView,
+  onExportPng,
+  onCopyShareLink,
+}) => {
+  const {
+    theme,
+    toggleTheme,
+    mode,
+    openCity,
+    openState,
+    openAdvisor,
+    openShowdown,
+    closeSidePanel,
+    setAlmanacOpen,
+    setHelpOpen,
+    activeTopMetric,
+    setActiveTopMetric,
+    geoScope,
+  } = useAppStore();
+
+  const [query, setQuery] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [anchorCenterX, setAnchorCenterX] = useState<number | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const metricZoneRef = useRef<HTMLDivElement>(null);
+  const metricBtnRefs = useRef<Partial<Record<TopMetricId, HTMLButtonElement | null>>>({});
+
+  const stateHexMap = useMemo(() => {
+    const m = new Map<string, number[]>();
+    for (let i = 0; i < world.n; i++) {
+      const sf = world.st[i];
+      let arr = m.get(sf);
+      if (!arr) {
+        arr = [];
+        m.set(sf, arr);
+      }
+      arr.push(i);
+    }
+    return m;
+  }, [world]);
+
+  const updateAnchor = (id: TopMetricId) => {
+    const el = metricBtnRefs.current[id];
+    const rect = el?.getBoundingClientRect();
+    if (rect && rect.width > 0) {
+      setAnchorCenterX(rect.left + rect.width / 2);
+      return;
+    }
+    const zoneRect = metricZoneRef.current?.getBoundingClientRect();
+    if (zoneRect && zoneRect.width > 0) {
+      setAnchorCenterX(zoneRect.right - 24);
+    }
+  };
+
+  const handleToggleMetric = (id: TopMetricId) => {
+    if (activeTopMetric === id) {
+      setActiveTopMetric(null);
+    } else {
+      updateAnchor(id);
+      setActiveTopMetric(id);
+    }
+  };
+
+  useEffect(() => {
+    if (!activeTopMetric) return;
+    updateAnchor(activeTopMetric);
+    const onResize = () => updateAnchor(activeTopMetric);
+    const onDocDown = (e: MouseEvent) => {
+      if (metricZoneRef.current && !metricZoneRef.current.contains(e.target as Node)) {
+        setActiveTopMetric(null);
+      }
+    };
+    window.addEventListener('resize', onResize);
+    document.addEventListener('mousedown', onDocDown);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      document.removeEventListener('mousedown', onDocDown);
+    };
+  }, [activeTopMetric, setActiveTopMetric]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.key === '/' || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k')) && document.activeElement !== inputRef.current) {
+        if ((document.activeElement as HTMLElement)?.tagName === 'INPUT') return;
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const searchResults = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    const out: { kind: 'city' | 'state' | 'wonder'; id: string; title: string; sub: string; x: number; y: number }[] = [];
+
+    for (const s of states) {
+      if (s.name.toLowerCase().includes(q) || s.abbr.toLowerCase() === q) {
+        out.push({ kind: 'state', id: s.fips, title: `${s.name} (${s.abbr})`, sub: `州 · ${(s.pop / 1e6).toFixed(2)}M 人 · GDP $${(s.gdp_musd / 1000).toFixed(0)}B`, x: s.x, y: s.y });
+      }
+    }
+    for (const c of cities) {
+      if (c.name.toLowerCase().includes(q) || c.short_name.toLowerCase().includes(q)) {
+        out.push({ kind: 'city', id: c.id, title: c.short_name, sub: `${c.state_abbr} 都会区 · ${(c.pop / 1e6).toFixed(2)}M 人`, x: c.x, y: c.y });
+      }
+      if (out.length >= 14) break;
+    }
+    if (layersData && out.length < 14) {
+      for (const w of layersData.wonders) {
+        if (w.name.toLowerCase().includes(q)) {
+          out.push({ kind: 'wonder', id: w.id, title: w.name, sub: `奇观 #${w.rank} · ${w.metric_label}`, x: w.x, y: w.y });
+        }
+        if (out.length >= 16) break;
+      }
+    }
+    return out.slice(0, 12);
+  }, [query, cities, states, layersData]);
+
+  const n = meta.nation;
+  const advActive = mode === 'advisor' || mode === 'explorer';
+
+  return (
+    <header
+      className="fixed top-0 left-0 right-0 h-11 z-40 flex items-center gap-2 px-3 border-b"
+      style={{
+        background: 'var(--surface-paper)',
+        borderColor: 'var(--border-strong)',
+        boxShadow: '0 2px 14px rgba(0,0,0,0.35)',
+      }}
+    >
+      {/* Brand Emblem */}
+      <button
+        onClick={onResetView}
+        className="flex items-center gap-2 shrink-0 cursor-pointer group whitespace-nowrap"
+        title="回到全美全景视图"
+      >
+        <span
+          className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border"
+          style={{ background: '#1B3A66', borderColor: 'var(--brass)', color: '#F7E7B8' }}
+        >
+          ★
+        </span>
+        <span className="font-display text-sm font-bold tracking-wider uppercase" style={{ color: 'var(--brass-bright)' }}>
+          UNITED STATES
+        </span>
+        <span className="text-[10.5px] opacity-60 hidden 2xl:inline">联邦六角志</span>
+      </button>
+
+      {/* National Real Yields Ledger (Each metric independently clickable for detailed breakdown & map-linked ranking) */}
+      <div ref={metricZoneRef} className="hidden lg:flex items-center gap-0.5 relative">
+        {([
+          {
+            id: 'population' as const,
+            icon: '👥',
+            iconClass: 'opacity-75 text-[11px]',
+            val: `${(n.population / 1e6).toFixed(0)}M`,
+            color: undefined,
+            title: '点击查看全美常住人口详情 (ACS 2025 B01003)',
+            displayClass: 'inline-flex',
+          },
+          {
+            id: 'food' as const,
+            icon: '🌾',
+            iconClass: 'text-[11px]',
+            val: `${((n.real_yields?.food ?? 1728726) / 1e6).toFixed(1)}M`,
+            color: 'var(--y-food)',
+            title: '点击查看粮食产出详情：农林渔牧从业人数 (ACS C24030)',
+            displayClass: 'inline-flex',
+          },
+          {
+            id: 'production' as const,
+            icon: '⚙',
+            iconClass: 'text-[11px]',
+            val: `${((n.real_yields?.production ?? 27878245) / 1e6).toFixed(1)}M`,
+            color: 'var(--y-prod)',
+            title: '点击查看生产力详情：制造、建筑与采矿从业人数 (ACS C24030)',
+            displayClass: 'inline-flex',
+          },
+          {
+            id: 'gold' as const,
+            icon: '●',
+            iconClass: 'text-[11px]',
+            val: `$${(n.gdp_musd / 1e6).toFixed(1)}T`,
+            color: 'var(--y-gold)',
+            title: '点击查看金币产出详情：BEA 2024 真实现价 GDP',
+            displayClass: 'inline-flex',
+          },
+          {
+            id: 'science' as const,
+            icon: '⚗',
+            iconClass: 'text-[11px]',
+            val: `${((n.real_yields?.science ?? 17255272) / 1e6).toFixed(1)}M`,
+            color: 'var(--y-science)',
+            title: '点击查看科研产出详情：专业科研与信息业从业人数 (ACS C24030)',
+            displayClass: 'inline-flex',
+          },
+          {
+            id: 'culture' as const,
+            icon: '🎭',
+            iconClass: 'text-[11px]',
+            val: `${((n.real_yields?.culture ?? 3791558) / 1e6).toFixed(1)}M`,
+            color: 'var(--y-culture)',
+            title: '点击查看文化产出详情：文化艺术与娱乐业从业人数 (ACS C24030)',
+            displayClass: 'inline-flex',
+          },
+          {
+            id: 'unemployment' as const,
+            icon: '💼',
+            iconClass: 'text-[11px]',
+            val: `${((n.unemployment ?? 0.0488) * 100).toFixed(1)}%`,
+            color: undefined,
+            title: '点击查看全美平民失业率详情 (ACS 2025 B23025)',
+            displayClass: 'hidden xl:inline-flex',
+          },
+        ]).map((item) => {
+          const active = activeTopMetric === item.id;
+          return (
+            <button
+              key={item.id}
+              ref={(el) => {
+                metricBtnRefs.current[item.id] = el;
+              }}
+              type="button"
+              onClick={() => handleToggleMetric(item.id)}
+              aria-expanded={active}
+              aria-haspopup="dialog"
+              title={item.title}
+              className={`${item.displayClass} items-center gap-1 font-mono-num text-xs font-bold px-2 py-1 rounded-md border transition cursor-pointer whitespace-nowrap ${
+                active
+                  ? 'border-[var(--brass)] bg-[var(--brass-soft)] shadow-sm'
+                  : 'border-transparent hover:bg-[var(--surface-paper-hover)] hover:border-[var(--border-hairline)]'
+              }`}
+              style={item.color ? { color: item.color } : undefined}
+            >
+              <span className={item.iconClass}>{item.icon}</span>
+              <span>{item.val}</span>
+            </button>
+          );
+        })}
+
+        {activeTopMetric && (
+          <TopMetricPopover
+            metric={activeTopMetric}
+            anchorCenterX={anchorCenterX}
+            meta={meta}
+            cities={cities}
+            states={states}
+            stateHexMap={stateHexMap}
+            onClose={() => setActiveTopMetric(null)}
+            onSelectMetric={(m) => {
+              updateAnchor(m);
+              setActiveTopMetric(m);
+            }}
+          />
+        )}
+      </div>
+
+      <div className="flex-1" />
+
+      {/* Fuzzy Global Search */}
+      <div className="relative w-44 sm:w-56 md:w-64 shrink-0">
+        <div
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs"
+          style={{ background: 'var(--surface-paper-subtle)', borderColor: 'var(--border-hairline)' }}
+        >
+          <Search className="w-3.5 h-3.5 opacity-60 shrink-0" />
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setTimeout(() => setSearchFocused(false), 180)}
+            placeholder={`搜索 ${geoScope === 'conus' ? (n.conus_metros ?? 524) : cities.length} 城、${geoScope === 'conus' ? 49 : states.length} 州、${n.total_wonders} 奇观...`}
+            className="w-full bg-transparent outline-none text-xs placeholder:opacity-55"
+          />
+          {query ? (
+            <button onClick={() => setQuery('')} className="opacity-60 hover:opacity-100 cursor-pointer">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          ) : (
+            <kbd className="text-[10px] font-mono-num px-1 rounded border border-[var(--border-hairline)] opacity-60">/</kbd>
+          )}
+        </div>
+
+        {searchFocused && searchResults.length > 0 && (
+          <div className="atlas-panel-brass absolute top-full mt-1.5 left-0 right-0 rounded-lg overflow-hidden py-1 z-50 max-h-80 overflow-y-auto">
+            {searchResults.map((item) => (
+              <button
+                key={`${item.kind}-${item.id}`}
+                onMouseDown={() => {
+                  setQuery('');
+                  if (item.kind === 'city') openCity(item.id);
+                  else if (item.kind === 'state') openState(item.id);
+                  else onFlyTo(item.x, item.y, 1.45);
+                }}
+                className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-paper-hover)] flex items-center justify-between gap-2 cursor-pointer"
+              >
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold truncate">{item.title}</div>
+                  <div className="text-[10px] opacity-65 truncate">{item.sub}</div>
+                </div>
+                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-[var(--brass-soft)] font-semibold shrink-0" style={{ color: 'var(--brass)' }}>
+                  {item.kind === 'city' ? '都会区' : item.kind === 'state' ? '州' : '奇观'}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Right Command Buttons */}
+      <div className="flex items-center gap-1 shrink-0 whitespace-nowrap">
+        <button
+          onClick={() => (advActive ? closeSidePanel() : openAdvisor('council'))}
+          className={`dock-btn !py-1 !px-2.5 ${advActive ? 'active' : ''}`}
+          style={{ borderColor: advActive ? 'var(--brass)' : 'var(--border-hairline)' }}
+          title="打开 9 位内阁顾问与全美探索器 (Council & Explorer)"
+        >
+          <Landmark className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--brass-bright)' }} />
+          <span className="hidden sm:inline">顾问团</span>
+        </button>
+
+        <button
+          onClick={() => (mode === 'showdown' ? closeSidePanel() : openShowdown('city'))}
+          className={`dock-btn !py-1 !px-2.5 ${mode === 'showdown' ? 'active' : ''}`}
+          style={{ borderColor: mode === 'showdown' ? 'var(--brass)' : 'var(--border-hairline)' }}
+          title="双城 / 双州国力 PK 对决"
+        >
+          <Scale className="w-3.5 h-3.5 shrink-0" />
+          <span className="hidden md:inline">国力 PK</span>
+        </button>
+
+        <button
+          onClick={toggleTheme}
+          className="dock-btn !p-1.5"
+          style={{ borderColor: 'var(--border-hairline)' }}
+          title={theme === 'midnight' ? '切换为 WPA 日光羊皮纸主题' : '切换为经典暗夜制图主题 (T)'}
+        >
+          {theme === 'midnight' ? <Sun className="w-3.5 h-3.5 text-amber-300" /> : <Moon className="w-3.5 h-3.5" />}
+        </button>
+
+        <button
+          onClick={onCopyShareLink}
+          className="dock-btn !py-1 !px-2 hidden sm:inline-flex"
+          style={{ borderColor: 'var(--border-hairline)' }}
+          title="复制当前视图分享链接"
+        >
+          <Share2 className="w-3.5 h-3.5" />
+          <span className="hidden xl:inline">分享</span>
+        </button>
+
+        <button
+          onClick={onExportPng}
+          className="dock-btn !p-1.5 hidden md:inline-flex"
+          style={{ borderColor: 'var(--border-hairline)' }}
+          title="导出高清 PNG 地图海报"
+        >
+          <CameraIcon className="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          onClick={() => setHelpOpen(true)}
+          className="dock-btn !p-1.5"
+          style={{ borderColor: 'var(--border-hairline)' }}
+          title="快捷键与操作帮助"
+        >
+          <HelpCircle className="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          onClick={() => setAlmanacOpen(true, 'sources')}
+          className="dock-btn !py-1 !px-2.5"
+          style={{ borderColor: 'var(--brass)', background: 'var(--brass-soft)', color: 'var(--brass-bright)' }}
+          title="打开《联邦百科全书》与全部 31 项公开数据源链接 (?)"
+        >
+          <BookOpen className="w-3.5 h-3.5 shrink-0" />
+          <span className="hidden sm:inline">百科</span>
+        </button>
+      </div>
+    </header>
+  );
+};

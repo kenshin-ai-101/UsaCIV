@@ -1,0 +1,14 @@
+# Raw & intermediate ETL caches
+pipeline/data_raw/
+pipeline/data_work/
+pipeline/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Frontend
+web/node_modules/
+web/dist/
+web/tsconfig.tsbuildinfo
+.DS_Store
+*.log

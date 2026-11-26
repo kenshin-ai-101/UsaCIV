@@ -1,0 +1,156 @@
+@import "tailwindcss";
+
+/*
+ * TERRA AMERICANA — Imperial Midnight Cartography (Default) + WPA Daylight Atlas (Toggle)
+ * Rich deep-ocean navy, burnished antique gold trim, luminous parchment ink, tactile jewel-toned data visuals.
+ */
+
+:root,
+html[data-theme="midnight"] {
+  --font-display: "Fraunces", "Noto Serif SC", Georgia, "Songti SC", serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --surface-sea-light: #16293d;
+  --surface-sea-deep: #0c1724;
+  --surface-paper: #121b27;
+  --surface-paper-elev: rgba(16, 24, 36, 0.94);
+  --surface-paper-subtle: #1a2535;
+  --surface-paper-hover: #233145;
+
+  --ink-primary: #f2ead8;
+  --ink-secondary: #bcc5cf;
+  --ink-muted: #7f8d9c;
+
+  --brass: #d4ae5e;
+  --brass-bright: #ecc777;
+  --brass-soft: rgba(212, 174, 94, 0.16);
+  --border-hairline: rgba(212, 174, 94, 0.22);
+  --border-strong: rgba(212, 174, 94, 0.52);
+  --shadow-card: 0 14px 36px rgba(0, 0, 0, 0.52), 0 1px 4px rgba(0, 0, 0, 0.36);
+
+  --y-food: #7ec868;
+  --y-prod: #eb9348;
+  --y-gold: #f0c954;
+  --y-science: #5eb2f5;
+  --y-culture: #c97ee8;
+  --y-faith: #87c4d4;
+  --y-amenities: #58c998;
+  --y-power: #f2a944;
+}
+
+html[data-theme="daylight"] {
+  --font-display: "Fraunces", "Noto Serif SC", Georgia, "Songti SC", serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --surface-sea-light: #d7e5eb;
+  --surface-sea-deep: #a2c0cf;
+  --surface-paper: #f6f1e7;
+  --surface-paper-elev: rgba(248, 244, 236, 0.95);
+  --surface-paper-subtle: #ece5d7;
+  --surface-paper-hover: #e4dac8;
+
+  --ink-primary: #1d242b;
+  --ink-secondary: #4e565e;
+  --ink-muted: #767167;
+
+  --brass: #b08234;
+  --brass-bright: #c99a45;
+  --brass-soft: rgba(176, 130, 52, 0.16);
+  --border-hairline: rgba(42, 50, 58, 0.16);
+  --border-strong: rgba(176, 130, 52, 0.48);
+  --shadow-card: 0 10px 30px rgba(26, 36, 46, 0.14), 0 1px 3px rgba(26, 36, 46, 0.08);
+
+  --y-food: #4b8f3c;
+  --y-prod: #c25b2d;
+  --y-gold: #c69128;
+  --y-science: #29669c;
+  --y-culture: #93456e;
+  --y-faith: #4f7280;
+  --y-amenities: #2f7e5c;
+  --y-power: #d47b20;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  color: var(--ink-primary);
+  background: var(--surface-sea-deep);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+.font-mono-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.atlas-panel {
+  background: var(--surface-paper-elev);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border-hairline);
+  box-shadow: var(--shadow-card);
+  color: var(--ink-primary);
+}
+
+.atlas-panel-brass {
+  background: var(--surface-paper-elev);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-card);
+  color: var(--ink-primary);
+}
+
+.dock-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.14s, border-color 0.14s, color 0.14s;
+}
+.dock-btn:hover {
+  background: var(--surface-paper-hover);
+  border-color: var(--border-hairline);
+}
+.dock-btn.active {
+  background: linear-gradient(180deg, rgba(212, 174, 94, 0.28), rgba(176, 130, 52, 0.18));
+  border-color: var(--brass);
+  color: var(--brass-bright);
+}
+html[data-theme="daylight"] .dock-btn.active {
+  background: var(--brass);
+  border-color: var(--brass);
+  color: #191f25;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-hairline);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--brass);
+}
