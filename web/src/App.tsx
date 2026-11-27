@@ -140,6 +140,7 @@ export default function App() {
           useAppStore.getState().setLocale(hash.get('lang') as 'en' | 'zh');
         }
         if (hash.get('theme') === 'daylight') useAppStore.getState().setTheme('daylight');
+        if (hash.get('trade') === '1') useAppStore.getState().setLayer('trade', true);
         if (hash.get('lens')) useAppStore.getState().setLens(hash.get('lens'));
         if (hash.get('city')) useAppStore.getState().openCity(hash.get('city')!);
         else if (hash.get('state')) useAppStore.getState().openState(hash.get('state')!);
@@ -262,6 +263,15 @@ export default function App() {
     cam.resize(window.innerWidth, window.innerHeight);
     const leftPad = (useAppStore.getState().mode === 'advisor' || useAppStore.getState().mode === 'explorer') && window.innerWidth >= 960 ? 540 : 28;
     cam.fitBounds(meta.bounds_km, { padLeft: leftPad, padRight: 28, padTop: 56, padBottom: 80, animate: false });
+    const initCam = new URLSearchParams(initialHashRef.current.replace(/^#/, '')).get('cam');
+    if (initCam) {
+      const parts = initCam.split(',').map(Number);
+      if (parts.length === 3 && parts.every((v) => Number.isFinite(v))) {
+        cam.cx = parts[0];
+        cam.cy = parts[1];
+        cam.scale = Math.max(cam.minScale, Math.min(cam.maxScale, parts[2]));
+      }
+    }
     requestDraw();
 
     const onResize = () => {

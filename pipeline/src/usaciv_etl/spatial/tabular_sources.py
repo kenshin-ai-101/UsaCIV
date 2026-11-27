@@ -767,13 +767,13 @@ def load_cdc_places(raw_dir: Path) -> dict[str, dict]:
 
 
 RELIGION_TRADITIONS = [
-    (1, "evangelical", "福音派新教", "#C96A4B", "EVANADH_2020"),
-    (2, "catholic", "天主教", "#3D73A8", "CATHADH_2020"),
-    (3, "mainline", "主流新教", "#C9A145", "MPRTADH_2020"),
-    (4, "black_prot", "非裔新教", "#8F5991", "BPRTADH_2020"),
-    (5, "lds", "后期圣徒教会", "#4E947C", "LDSADH_2020"),
-    (6, "orthodox", "东正教", "#5B6FA8", "ORTHADH_2020"),
-    (7, "other", "其他宗教传统", "#8A8175", "OTHADH_2020"),
+    (1, "evangelical", "福音派新教", "#c8643b", "EVANADH_2020"),
+    (2, "catholic", "天主教", "#e3b23c", "CATHADH_2020"),
+    (3, "mainline", "主流新教", "#4f7cc0", "MPRTADH_2020"),
+    (4, "black_prot", "非裔新教", "#8a5bb5", "BPRTADH_2020"),
+    (5, "lds", "后期圣徒教会", "#6aa84f", "LDSADH_2020"),
+    (6, "orthodox", "东正教", "#2f9e95", "ORTHADH_2020"),
+    (7, "other", "其他宗教传统", "#9a9aa8", "OTHADH_2020"),
 ]
 
 

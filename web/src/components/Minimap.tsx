@@ -4,8 +4,10 @@ import { useAppStore } from '../store/useAppStore';
 import { useL } from '../i18n';
 import {
   BIOME_COLORS_DAY,
-  BIOME_COLORS_MIDNIGHT,
+  COVER_RGB,
+  NO_DATA_RGB255,
   hexToRgb01,
+  lensNorm,
   sampleRamp,
 } from '../features/lenses/lensConfig';
 import type { MapCamera } from '../engine/camera';
@@ -51,30 +53,39 @@ export const Minimap: React.FC<MinimapProps> = ({ world, meta, activeLens, camer
     const sx = (wx: number) => ((wx - bx0) / (bx1 - bx0)) * (W - 12) + 6;
     const sy = (wy: number) => ((by1 - wy) / (by1 - by0)) * (H - 12) + 6;
 
-    ctx.fillStyle = theme === 'daylight' ? '#BFD6E2' : '#0E1F33';
+    ctx.fillStyle = theme === 'daylight' ? '#BFD6E2' : '#0E2845';
     ctx.fillRect(0, 0, W, H);
 
-    // Live-colored minimap reflecting Terrain OR Active Lens!
-    const biomes = theme === 'daylight' ? BIOME_COLORS_DAY : BIOME_COLORS_MIDNIGHT;
+    // Live-colored minimap reflecting exact 12-class NLCD Terrain OR Active Lens (with log/linear lensNorm)!
     const lVals = activeLens ? world.lenses[activeLens.id] : null;
-    const span = activeLens ? Math.max(1e-9, activeLens.p98 - activeLens.p02) : 1;
     const catMap = new Map<number, [number, number, number]>();
     if (activeLens?.categorical && activeLens.categories) {
       for (const c of activeLens.categories) catMap.set(c.id, hexToRgb01(c.color));
     }
+    const noData01: [number, number, number] = [
+      NO_DATA_RGB255[0] / 255,
+      NO_DATA_RGB255[1] / 255,
+      NO_DATA_RGB255[2] / 255,
+    ];
 
     for (let i = 0; i < world.n; i += 2) {
       let rgb: [number, number, number];
       if (!activeLens || !lVals) {
-        rgb = biomes[world.biome[i]] ?? biomes[0];
+        if (theme === 'daylight') {
+          rgb = BIOME_COLORS_DAY[world.biome[i]] ?? BIOME_COLORS_DAY[0];
+        } else {
+          const cov = world.cover ? world.cover[i] : 6;
+          const c255 = COVER_RGB[cov] ?? [149, 174, 96];
+          rgb = [c255[0] / 255, c255[1] / 255, c255[2] / 255];
+        }
       } else {
         const v = lVals[i];
-        if (v == null) rgb = [0.22, 0.25, 0.3];
-        else if (activeLens.categorical) rgb = catMap.get(Math.round(v)) ?? [0.4, 0.4, 0.4];
-        else rgb = sampleRamp(activeLens.ramp, (v - activeLens.p02) / span);
+        if (v == null || Number.isNaN(v)) rgb = noData01;
+        else if (activeLens.categorical) rgb = catMap.get(Math.round(v)) ?? noData01;
+        else rgb = sampleRamp(activeLens.ramp, lensNorm(activeLens, v));
       }
       ctx.fillStyle = `rgb(${Math.round(rgb[0] * 255)},${Math.round(rgb[1] * 255)},${Math.round(rgb[2] * 255)})`;
-      ctx.fillRect(sx(world.x[i]), sy(world.y[i]), 2, 2);
+      ctx.fillRect(sx(world.x[i]), sy(world.y[i]), 2.1, 2.1);
     }
 
     // Viewport rectangle

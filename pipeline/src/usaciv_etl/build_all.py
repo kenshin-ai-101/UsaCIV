@@ -67,26 +67,27 @@ DISTRICT_CATALOG = [
     {"id": "bastion", "name": "军事要塞营地", "name_en": "Military Bastion", "color": "#5B6B7C", "naics": ["928110"], "naics_label": "DoD 现役军事基地与防务", "rule": "DoD MIRTA 大型驻军基地驻地或国家安全高集中度"},
 ]
 
+# Exact 19 Data Lenses aligned with reference domains, log/linear scales & individual 6-stop color ramps
 LENS_SPECS = [
-    ("density", "人口密度", "Population Density", "people", "人 / km²", "dec1", "density", "neutral", "acs_5yr", "每平方公里陆地常住人口数（ACS B01003 按面积分配到 25 km 六边形）。色带按 2%–98% 分位截断。"),
-    ("income", "家庭中位收入", "Median Household Income", "prosperity", "美元 / 年", "usd", "wealth", "good", "acs_5yr", "六边形所跨县的家庭中位年收入，按人口加权合成（ACS B19013）。"),
-    ("home", "房价中位数", "Median Home Value", "prosperity", "美元", "usd", "wealth", "neutral", "acs_5yr", "自有住房中位估值，按人口加权合成（ACS B25077）。"),
-    ("poverty", "贫困率", "Poverty Rate", "prosperity", "人口占比", "pct", "risk", "bad", "acs_5yr", "家庭收入低于联邦贫困线的人口占比（ACS B17001）。"),
-    ("age", "中位年龄", "Median Age", "people", "岁", "dec1", "faith", "neutral", "acs_5yr", "常住人口中位年龄（ACS B01002），呈现老龄化与年轻增长带。"),
-    ("foreign_born", "外国出生人口", "Foreign-Born Share", "people", "人口占比", "pct", "knowledge", "neutral", "acs_5yr", "出生在美国境外的常住人口占比（ACS B05012）。"),
-    ("bachelors", "本科及以上学历", "Bachelor's Degree+", "knowledge", "25岁+成人占比", "pct", "knowledge", "good", "acs_5yr", "25 岁及以上人口中拥有本科、硕士、专业或博士学位的比例（ACS B15003）。"),
-    ("broadband", "宽带普及率", "Broadband Access", "knowledge", "家庭占比", "pct", "knowledge", "good", "acs_5yr", "拥有任意类型宽带互联网订阅的家庭占比（ACS B28002）。"),
-    ("commute", "平均单程通勤", "Mean Commute Time", "life", "分钟 / 单程", "min", "risk", "bad", "acs_5yr", "16 岁以上非居家办公劳动者的平均单程通勤时间（ACS B08013 ÷ B08303）。"),
-    ("homeownership", "住房自有率", "Homeownership Rate", "life", "自住占比", "pct", "farmland", "neutral", "acs_5yr", "由房主自住的住房占全部已入住住房的比例（ACS B25003）。"),
-    ("uninsured", "无医保比例", "Uninsured Share", "life", "人口占比", "pct", "risk", "bad", "acs_5yr", "无任何医疗保险覆盖的平民人口占比（ACS B27010）。"),
-    ("forest", "森林覆盖率", "Forest Cover", "land", "陆地占比", "pct", "forest", "neutral", "nlcd", "六边形陆地中落叶林、常绿林与混交林的真实覆被占比（USGS NLCD）。"),
-    ("farmland", "农田与牧场", "Farmland & Pasture", "land", "陆地占比", "pct", "farmland", "neutral", "nlcd", "六边形陆地中耕地与牧草地的真实覆被占比（USGS NLCD 81 + 82）。"),
-    ("developed", "城镇建设用地", "Built-Up Intensity", "land", "陆地占比", "pct", "urban", "neutral", "nlcd", "六边形陆地中低/中/高密度建成区占比（USGS NLCD 22–24）。"),
-    ("faith", "宗教信徒率", "Religious Adherents", "faith", "人 / 百名居民", "dec1", "faith", "neutral", "usrc_2020", "2020 年美国宗教普查各教派信徒总数占当地总人口比例（每百人信徒数，ARDA RCMSCY20）。康州因旧县口径变更留白。"),
-    ("faith_tradition", "第一大宗教传统", "Largest Religious Tradition", "faith", "主导宗派", "cat", "cat", "neutral", "usrc_2020", "2020 年各县信徒人数最多的宗教传统（将后期圣徒教会从其他中独立拆分，ARDA RCMSCY20）。"),
-    ("amenities", "健康宜居指数", "Wellbeing / Amenities", "life", "指数 (100=全美均值)", "index", "amenities", "good", "cdc_places", "基于 CDC PLACES 2025 四项成人身心健康指标（心理困扰、抑郁、自评欠佳、缺乏运动）反向 Z-score 合成：100 为全美均值，+10 代表优于均值 1 个标准差。无数据州严格留白。"),
-    ("disasters", "FEMA 重大灾害", "Major Disasters (2000+)", "hazards", "独立重大灾害次数", "int", "risk", "bad", "fema_declarations", "2000 年至今各县获批的独立联邦重大灾害（DR，不含生物/疫情）累计声明次数（OpenFEMA v2）。"),
-    ("veterans", "退伍军人占比", "Veterans Share", "people", "18岁+平民占比", "pct", "urban", "neutral", "acs_5yr", "18 岁及以上平民人口中的退伍军人占比（ACS B21001）。"),
+    ("density", "人口密度", "Population Density", "people", "人 / km²", "dec1", "density", "neutral", "acs_5yr", "每平方公里陆地常住人口数（ACS B01003 按面积分配到 25 km 六边形）。对数色阶 [0.34, 390]。", "log", (0.34, 390.0)),
+    ("income", "家庭中位收入", "Median Household Income", "prosperity", "美元 / 年", "usd", "income", "good", "acs_5yr", "六边形所跨县的家庭中位年收入，按人口加权合成（ACS B19013）。", "linear", (41000.0, 110000.0)),
+    ("home", "房价中位数", "Median Home Value", "prosperity", "美元", "usd", "home", "neutral", "acs_5yr", "自有住房中位估值，按人口加权合成（ACS B25077）。对数色阶 [$89K, $690K]。", "log", (89000.0, 690000.0)),
+    ("poverty", "贫困率", "Poverty Rate", "prosperity", "人口占比", "pct", "poverty", "bad", "acs_5yr", "家庭收入低于联邦贫困线的人口占比（ACS B17001）。", "linear", (0.065, 0.30)),
+    ("age", "中位年龄", "Median Age", "people", "岁", "dec1", "age", "neutral", "acs_5yr", "常住人口中位年龄（ACS B01002），呈现老龄化与年轻增长带。", "linear", (31.0, 54.0)),
+    ("foreign_born", "外国出生人口", "Foreign-Born Share", "people", "人口占比", "pct", "foreign_born", "neutral", "acs_5yr", "出生在美国境外的常住人口占比（ACS B05012）。", "linear", (0.007, 0.25)),
+    ("bachelors", "本科及以上学历", "Bachelor's Degree+", "knowledge", "25岁+成人占比", "pct", "bachelors", "good", "acs_5yr", "25 岁及以上人口中拥有本科、硕士、专业或博士学位的比例（ACS B15003）。", "linear", (0.12, 0.51)),
+    ("broadband", "宽带普及率", "Broadband Access", "knowledge", "家庭占比", "pct", "broadband", "good", "acs_5yr", "拥有任意类型宽带互联网订阅的家庭占比（ACS B28002）。", "linear", (0.72, 0.95)),
+    ("commute", "平均单程通勤", "Mean Commute Time", "life", "分钟 / 单程", "min", "commute", "bad", "acs_5yr", "16 岁以上非居家办公劳动者的平均单程通勤时间（ACS B08013 ÷ B08303）。", "linear", (13.0, 33.0)),
+    ("homeownership", "住房自有率", "Homeownership Rate", "life", "自住占比", "pct", "homeownership", "neutral", "acs_5yr", "由房主自住的住房占全部已入住住房的比例（ACS B25003）。", "linear", (0.55, 0.84)),
+    ("uninsured", "无医保比例", "Uninsured Share", "life", "人口占比", "pct", "uninsured", "bad", "acs_5yr", "无任何医疗保险覆盖的平民人口占比（ACS B27010）。", "linear", (0.036, 0.22)),
+    ("forest", "森林覆盖率", "Forest Cover", "land", "陆地占比", "pct", "forest", "neutral", "nlcd", "六边形陆地中落叶林、常绿林与混交林的真实覆被占比（USGS NLCD）。", "linear", (0.0, 0.84)),
+    ("farmland", "农田与牧场", "Farmland & Pasture", "land", "陆地占比", "pct", "farmland", "neutral", "nlcd", "六边形陆地中耕地与牧草地的真实覆被占比（USGS NLCD 81 + 82）。", "linear", (0.0, 0.87)),
+    ("developed", "城镇建设用地", "Built-Up Intensity", "land", "陆地占比", "pct", "developed", "neutral", "nlcd", "六边形陆地中低/中/高密度建成区占比（USGS NLCD 22–24）。", "linear", (0.0, 0.27)),
+    ("faith", "宗教信徒率", "Religious Adherents", "faith", "人 / 百名居民", "dec1", "faith", "neutral", "usrc_2020", "2020 年美国宗教普查各教派信徒总数占当地总人口比例（每百人信徒数，ARDA RCMSCY20）。康州因旧县口径变更留白。", "linear", (0.0, 100.0)),
+    ("faith_tradition", "第一大宗教传统", "Largest Religious Tradition", "faith", "主导宗派", "cat", "cat", "neutral", "usrc_2020", "2020 年各县信徒人数最多的宗教传统（将后期圣徒教会从其他中独立拆分，ARDA RCMSCY20）。", "linear", (1.0, 7.0)),
+    ("amenities", "健康宜居指数", "Wellbeing / Amenities", "life", "指数 (100=全美均值)", "index", "amenities", "good", "cdc_places", "基于 CDC PLACES 2025 四项成人身心健康指标（心理困扰、抑郁、自评欠佳、缺乏运动）反向 Z-score 合成：100 为全美均值，+10 代表优于均值 1 个标准差。无数据州严格留白。", "linear", (85.0, 120.0)),
+    ("disasters", "FEMA 重大灾害", "Major Disasters (2000+)", "hazards", "独立重大灾害次数", "int", "disasters", "bad", "fema_declarations", "2000 年至今各县获批的独立联邦重大灾害（DR，不含生物/疫情）累计声明次数（OpenFEMA v2）。", "linear", (0.0, 18.0)),
+    ("veterans", "退伍军人占比", "Veterans Share", "people", "18岁+平民占比", "pct", "veterans", "neutral", "acs_5yr", "18 岁及以上平民人口中的退伍军人占比（ACS B21001）。", "linear", (0.034, 0.16)),
 ]
 
 LAND_KEYS = ["forest", "crop", "pasture", "grass", "shrub", "wetland", "developed"]
@@ -959,31 +960,32 @@ def run_build():
         })
     county_rows.sort(key=lambda r: r["pop"], reverse=True)
 
-    # 10. Compute Lens quantile metadata (p02..p98) for all 19 lenses
+    # 10. Compute Lens metadata with exact reference domains & log/linear scales for all 19 lenses
     lenses_meta = []
-    for (lid, name, name_en, grp, unit, fmt, ramp, hi, src_id, desc) in LENS_SPECS:
+    for (lid, name, name_en, grp, unit, fmt, ramp, hi, src_id, desc, scale, dom) in LENS_SPECS:
         vals = [v for v in hex_lenses[lid] if v is not None]
         if lid == "faith_tradition":
             lenses_meta.append({
                 "id": lid, "name": name, "name_en": name_en, "group": grp, "unit": unit,
-                "format": fmt, "ramp": ramp, "higher_is": hi, "source_id": src_id, "description": desc,
+                "format": fmt, "ramp": ramp, "scale": scale, "domain": [1, 7],
+                "higher_is": hi, "source_id": src_id, "description": desc,
                 "p02": 1, "p98": 7, "min": 1, "max": 7, "median": 1,
                 "categorical": True,
                 "categories": [{"id": t[0], "key": t[1], "label": t[2], "color": t[3]} for t in RELIGION_TRADITIONS],
             })
         else:
             arr = np.array(vals, dtype=np.float64)
-            p02, med, p98 = np.percentile(arr, [2, 50, 98])
-            if lid == "faith":
-                p02, p98 = 10.0, 95.0
+            med = float(np.percentile(arr, 50))
+            d0, d1 = float(dom[0]), float(dom[1])
             lenses_meta.append({
                 "id": lid, "name": name, "name_en": name_en, "group": grp, "unit": unit,
-                "format": fmt, "ramp": ramp, "higher_is": hi, "source_id": src_id, "description": desc,
-                "p02": round(float(p02), 4),
-                "p98": round(float(p98), 4),
+                "format": fmt, "ramp": ramp, "scale": scale, "domain": [d0, d1],
+                "higher_is": hi, "source_id": src_id, "description": desc,
+                "p02": round(d0, 4),
+                "p98": round(d1, 4),
                 "min": round(float(arr.min()), 4),
                 "max": round(float(arr.max()), 4),
-                "median": round(float(med), 4),
+                "median": round(med, 4),
             })
 
     # 11. National Summary & Reconciliation Audit
@@ -1110,15 +1112,31 @@ def run_build():
         "fema_types": [{"id": t[0], "label": t[1]} for t in FEMA_TYPE_DEFS],
     }
 
+    def _pct_int(col_arr: np.ndarray) -> list[int]:
+        return [0 if np.isnan(v) else int(round(float(v) * 100.0)) for v in col_arr]
+
     world_hex_out = {
         "n": n_hex,
         "x": [round(float(v), 1) for v in mx_arr],
         "y": [round(float(v), 1) for v in my_arr],
         "r": [round(float(v), 2) for v in hex_df["map_r"].to_numpy()],
         "reg": [int(v) for v in reg_arr],
+        "lon": [round(float(v), 1) for v in hex_df["lon"].to_numpy()],
+        "lat": [round(float(v), 1) for v in hex_df["lat"].to_numpy()],
         "elev": [int(round(float(v))) for v in elev_arr],
+        "emax": [int(round(float(v))) for v in hex_df["elev_max"].to_numpy()],
         "rcls": [int(v) for v in rcls_arr],
         "biome": [int(v) for v in hex_df["biome"].to_numpy()],
+        "cover": [int(v) for v in hex_df["cover"].to_numpy()],
+        "pct": {
+            "f": _pct_int(nlcd_cols["forest"]),
+            "c": _pct_int(nlcd_cols["crop"]),
+            "p": _pct_int(nlcd_cols["pasture"]),
+            "g": _pct_int(nlcd_cols["grass"]),
+            "s": _pct_int(nlcd_cols["shrub"]),
+            "w": _pct_int(nlcd_cols["wetland"]),
+            "d": _pct_int(nlcd_cols["developed"]),
+        },
         "dom_land": [int(v) for v in dom_land],
         "river": [int(v) for v in river_arr],
         "shale": [int(v) for v in shale_arr],

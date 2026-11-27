@@ -1,22 +1,34 @@
 /**
- * WebGL2 Flat 2D Tactile Hex Renderer — Midnight Cartography & Daylight Atlas
- * Renders 18,284 flat equal-area 25 km hexagons (CONUS + AK + HI) at 60-120fps with crisp
- * true-hex edge hairlines, jewel-toned lens ramps, histogram drag-slice filtering,
- * and advisor terrain-dimming mode.
+ * WebGL2 Flat 2D Tactile Hex Renderer — Exact Reference Terrain & 19 Data Lenses
+ * Renders 18,284 flat equal-area 25 km hexagons (CONUS + AK + HI) at 60-120fps with:
+ *  - Exact 12-class NLCD terrain pigments + 30% multi-cover blending + elevation dust + relief tint + NW hill-shading
+ *  - Exact 19 Data Lens 6-stop ramps, log/linear scales, fixed domains, 60% NW hill-shading under lenses,
+ *    #55534d missing-data fill, and cool-slate out-of-band dimming
+ *  - Crisp zoom-adaptive hex grid hairlines
  */
 import type { LensMeta, ThemeMode, WorldHexData } from '../../types/world';
 import {
   BIOME_COLORS_DAY,
-  BIOME_COLORS_MIDNIGHT,
+  COVER_RGB,
+  DIM_SLATE_RGB255,
+  NO_DATA_RGB255,
+  desaturateRgb,
+  elevColor255,
   getNullColor,
-  hexToRgb01,
-  sampleRamp,
+  hash01,
+  lensNorm,
+  mixRgb,
+  parseHex255,
+  sampleRamp255,
+  shadeRgb,
+  type Rgb255,
 } from '../../features/lenses/lensConfig';
+import { getWorldTopology } from '../hexTopology';
 import type { MapCamera } from '../camera';
 
 /** Shared scale factor so adjacent rounded-km hexes tile seamlessly with zero seam gaps
  *  while matching OverlayRenderer's Canvas2D outlines to sub-pixel precision. */
-export const HEX_DRAW_SCALE = 1.003;
+export const HEX_DRAW_SCALE = 1.004;
 
 const VERT_SRC = `#version 300 es
 precision highp float;
@@ -76,11 +88,11 @@ void main() {
   vec3 col = v_color;
 
   // Exact pointy-top hex edge distance (0 at center, 1.0 along all 6 straight edges)
+  // Matches reference map.js: grid hairlines appear once Rpx > 11 (camScale > ~0.44) up to 0.14 alpha
   vec2 p = abs(v_localPos);
   float edgeFrac = max(p.x, p.x * 0.5 + p.y * 0.86602540378) / 0.86602540378;
   float fw = max(fwidth(edgeFrac), 0.001);
-  // Crisp, flat 1px hex grid hairline that fades smoothly when zoomed far out
-  float zoomVis = smoothstep(0.20, 0.58, u_camScale);
+  float zoomVis = smoothstep(0.36, 0.82, u_camScale);
   float edgeLine = smoothstep(1.0 - fw * 1.15, 1.0 - fw * 0.15, edgeFrac) * zoomVis;
   float edgeStrength = u_isMidnight > 0.5 ? 0.14 : 0.11;
   col *= (1.0 - edgeLine * edgeStrength);
@@ -91,12 +103,12 @@ void main() {
   }
 
   if (v_hi < -0.5) {
-    vec3 fog = u_isMidnight > 0.5 ? vec3(0.07, 0.11, 0.16) : vec3(0.84, 0.82, 0.77);
-    col = mix(col, fog, 0.66);
+    vec3 fog = u_isMidnight > 0.5 ? vec3(0.10, 0.13, 0.17) : vec3(0.84, 0.82, 0.77);
+    col = mix(col, fog, 0.62);
   } else if (v_hi > 1.5) {
-    col = mix(col, vec3(1.0, 0.94, 0.72), 0.18);
+    col = mix(col, vec3(1.0, 0.94, 0.72), 0.16);
   } else if (v_hi > 0.5) {
-    col = mix(col, vec3(1.0, 0.96, 0.80), u_isMidnight > 0.5 ? 0.22 : 0.14);
+    col = mix(col, vec3(1.0, 0.96, 0.80), u_isMidnight > 0.5 ? 0.18 : 0.12);
   }
   outColor = vec4(col, 1.0);
 }
@@ -129,6 +141,17 @@ function buildFlatHexGeometry(): { data: Float32Array; vertexCount: number } {
   return { data: new Float32Array(out), vertexCount: out.length / 2 };
 }
 
+// Reference PCT_COVER mapping: forest=3, crop=7, pasture=6, grass=5, shrub=4, wetland=8, developed=9
+const PCT_MIX_COLS: { key: keyof NonNullable<WorldHexData['pct']>; rgb: Rgb255 }[] = [
+  { key: 'f', rgb: COVER_RGB[3]! },
+  { key: 'c', rgb: COVER_RGB[7]! },
+  { key: 'p', rgb: COVER_RGB[6]! },
+  { key: 'g', rgb: COVER_RGB[5]! },
+  { key: 's', rgb: COVER_RGB[4]! },
+  { key: 'w', rgb: COVER_RGB[8]! },
+  { key: 'd', rgb: COVER_RGB[9]! },
+];
+
 export class HexRenderer {
   private gl: WebGL2RenderingContext;
   private prog: WebGLProgram;
@@ -140,6 +163,7 @@ export class HexRenderer {
   private hiBuf: WebGLBuffer;
   private colData: Float32Array = new Float32Array(0);
   private hiData: Float32Array = new Float32Array(0);
+  private shadeK: Float32Array = new Float32Array(0);
 
   private uCamCenter: WebGLUniformLocation;
   private uCamScale: WebGLUniformLocation;
@@ -193,6 +217,10 @@ export class HexRenderer {
     const n = world.n;
     this.instanceCount = n;
 
+    // Precompute O(N) 6-neighbor NW hill-shading
+    const topo = getWorldTopology(world);
+    this.shadeK = topo.shadeK;
+
     const xyr = new Float32Array(n * 3);
     this.colData = new Float32Array(n * 3);
     this.hiData = new Float32Array(n);
@@ -230,60 +258,104 @@ export class HexRenderer {
   updateColors(world: WorldHexData, lens: LensMeta | null, theme: ThemeMode, bandSlice: [number, number] | null) {
     const n = this.instanceCount;
     if (n === 0) return;
-    const biomes = theme === 'daylight' ? BIOME_COLORS_DAY : BIOME_COLORS_MIDNIGHT;
-    const nullCol = getNullColor(theme);
+
+    const isDay = theme === 'daylight';
+    const nullRgb255: Rgb255 = isDay
+      ? getNullColor('daylight').map((v) => v * 255) as Rgb255
+      : NO_DATA_RGB255;
     const lensVals = lens ? world.lenses[lens.id] : null;
-    const catMap = new Map<number, [number, number, number]>();
+    const catMap = new Map<number, Rgb255>();
     if (lens?.categorical && lens.categories) {
-      for (const c of lens.categories) catMap.set(c.id, hexToRgb01(c.color));
+      for (const c of lens.categories) catMap.set(c.id, parseHex255(c.color));
     }
-    const span = lens ? Math.max(1e-9, lens.p98 - lens.p02) : 1;
+
+    const coverArr = world.cover;
+    const pct = world.pct;
+    const shadeK = this.shadeK;
 
     for (let i = 0; i < n; i++) {
-      let rgb: [number, number, number];
+      let c255: Rgb255;
 
       if (!lens || !lensVals) {
-        const b = biomes[world.biome[i]] ?? biomes[0];
-        const e = world.elev[i];
-        // Subtle deterministic tile variation so broad plains & forests feel organic while staying flat
-        const jitter = (((i * 2654435761) >>> 24) / 255 - 0.5) * 0.04;
-        let r = b[0] + jitter;
-        let g = b[1] + jitter;
-        let bl = b[2] + jitter * 0.7;
+        // Exact reference landRGB + terrainRGB algorithm
+        const cv = coverArr ? coverArr[i] : 0;
+        const elev = world.elev[i];
+        const rel = world.rcls[i];
 
-        if (e > 2100) {
-          const snowT = Math.min(0.68, (e - 2100) / 1450);
-          const peak = theme === 'daylight' ? [0.95, 0.93, 0.90] : [0.85, 0.85, 0.84];
-          r = r + (peak[0] - r) * snowT;
-          g = g + (peak[1] - g) * snowT;
-          bl = bl + (peak[2] - bl) * snowT;
+        if (cv > 0 && COVER_RGB[cv]) {
+          c255 = [...COVER_RGB[cv]!] as Rgb255;
+          if (pct) {
+            let tot = 0;
+            let mr = 0;
+            let mg = 0;
+            let mb = 0;
+            for (let k = 0; k < PCT_MIX_COLS.length; k++) {
+              const entry = PCT_MIX_COLS[k];
+              const p = pct[entry.key]?.[i] || 0;
+              if (!p) continue;
+              tot += p;
+              mr += entry.rgb[0] * p;
+              mg += entry.rgb[1] * p;
+              mb += entry.rgb[2] * p;
+            }
+            if (tot > 0) c255 = mixRgb(c255, [mr / tot, mg / tot, mb / tot], 0.3);
+          }
+          // Subtle high-elevation dusty tint
+          const dustT = Math.max(0, Math.min(1, (elev - 300) / 2800));
+          if (dustT > 0) c255 = mixRgb(c255, [176, 160, 128], dustT * 0.28);
+        } else {
+          // Fallback to elevation color or Daylight legacy biome
+          c255 = elevColor255(elev);
         }
-        rgb = [Math.max(0, Math.min(1, r)), Math.max(0, Math.min(1, g)), Math.max(0, Math.min(1, bl))];
+
+        // Relief rock/snow tinting
+        if (rel >= 2) {
+          c255 = mixRgb(c255, rel === 3 ? [200, 204, 208] : [128, 116, 102], rel === 3 ? 0.45 : 0.32);
+        } else if (rel === 1) {
+          c255 = shadeRgb(c255, -0.05);
+        }
+
+        // Deterministic organic jitter + NW hill-shading
+        const sk = shadeK[i] || 0;
+        c255 = shadeRgb(c255, (hash01(i, 7) - 0.5) * 0.08 + sk);
+
+        // Optional Daylight theme: softly lift toward warm WPA parchment while keeping full relief contrast
+        if (isDay) {
+          const dayB = BIOME_COLORS_DAY[world.biome[i]] ?? BIOME_COLORS_DAY[0];
+          c255 = mixRgb(c255, [dayB[0] * 255, dayB[1] * 255, dayB[2] * 255], 0.28);
+        }
       } else {
+        // Exact reference applyLens algorithm (log/linear scale, 6-stop ramp, #55534d NO_DATA, cool-slate out-of-band, 60% NW hill-shading)
         const v = lensVals[i];
         if (v === null || v === undefined || Number.isNaN(v)) {
-          rgb = nullCol;
+          c255 = nullRgb255;
         } else if (lens.categorical) {
-          rgb = catMap.get(Math.round(v)) ?? nullCol;
+          c255 = catMap.get(Math.round(v)) ?? nullRgb255;
         } else {
-          const t = (v - lens.p02) / span;
-          rgb = sampleRamp(lens.ramp, t);
+          const tv = lensNorm(lens, v);
+          c255 = sampleRamp255(lens.ramp, tv);
         }
+
+        if (bandSlice) {
+          const inBand =
+            v !== null &&
+            v !== undefined &&
+            !Number.isNaN(v) &&
+            (lens.categorical ? Math.round(v) === bandSlice[0] : v >= bandSlice[0] && v <= bandSlice[1]);
+          if (!inBand) {
+            const dimTarget: Rgb255 = isDay ? [216, 212, 202] : DIM_SLATE_RGB255;
+            c255 = mixRgb(desaturateRgb(c255, 0.92), dimTarget, 0.66);
+          }
+        }
+
+        // Keep 60% of NW hill-shading underneath every data lens!
+        const sk = shadeK[i] || 0;
+        if (sk !== 0) c255 = shadeRgb(c255, sk * 0.6);
       }
 
-      if (lens && lensVals && bandSlice) {
-        const v = lensVals[i];
-        const inBand =
-          v !== null && v !== undefined && (lens.categorical ? Math.round(v) === bandSlice[0] : v >= bandSlice[0] && v <= bandSlice[1]);
-        if (!inBand) {
-          const bg = theme === 'daylight' ? [0.85, 0.83, 0.78] : [0.09, 0.13, 0.19];
-          rgb = [rgb[0] * 0.22 + bg[0] * 0.78, rgb[1] * 0.22 + bg[1] * 0.78, rgb[2] * 0.22 + bg[2] * 0.78];
-        }
-      }
-
-      this.colData[i * 3] = rgb[0];
-      this.colData[i * 3 + 1] = rgb[1];
-      this.colData[i * 3 + 2] = rgb[2];
+      this.colData[i * 3] = Math.max(0, Math.min(1, c255[0] / 255));
+      this.colData[i * 3 + 1] = Math.max(0, Math.min(1, c255[1] / 255));
+      this.colData[i * 3 + 2] = Math.max(0, Math.min(1, c255[2] / 255));
     }
 
     const gl = this.gl;

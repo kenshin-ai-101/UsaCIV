@@ -49,7 +49,9 @@ export interface LensMeta {
   group: 'people' | 'prosperity' | 'knowledge' | 'life' | 'faith' | 'hazards' | 'land';
   unit: string;
   format: 'int' | 'pct' | 'usd' | 'usd_k' | 'dec1' | 'min' | 'index' | 'cat';
-  ramp: 'wealth' | 'knowledge' | 'risk' | 'forest' | 'farmland' | 'urban' | 'faith' | 'density' | 'amenities' | 'cat';
+  ramp: string;
+  scale?: 'linear' | 'log';
+  domain?: [number, number];
   higher_is: 'good' | 'bad' | 'neutral';
   source_id: string;
   description: string;
@@ -191,9 +193,22 @@ export interface WorldHexData {
   y: number[];
   r: number[];
   reg: number[];
+  lon?: number[];
+  lat?: number[];
   elev: number[];
+  emax?: number[];
   rcls: number[];
   biome: number[];
+  cover?: number[];
+  pct?: {
+    f: number[];
+    c: number[];
+    p: number[];
+    g: number[];
+    s: number[];
+    w: number[];
+    d: number[];
+  };
   dom_land?: number[];
   river: number[];
   shale: number[];
@@ -410,6 +425,7 @@ export interface MineNode {
 export interface PortNode {
   name: string;
   state: string;
+  port_type?: 'coastal' | 'great_lakes' | 'inland' | string;
   rank?: number;
   tons: number;
   domestic?: number;
@@ -443,6 +459,8 @@ export interface MilitaryBaseNode {
   component: string;
   tier?: 'major' | 'base' | 'site';
   joint?: boolean;
+  airfield?: boolean;
+  status?: string;
   state: string;
   area_km2?: number | null;
   x: number;
@@ -467,6 +485,7 @@ export interface WonderNode {
   id: string;
   kind: 'natural' | 'academic' | 'heritage';
   rule_id?: 'national_park' | 'park_unit' | 'research_university' | 'landmark';
+  motif?: string;
   rank: number;
   name: string;
   state: string;

@@ -732,9 +732,22 @@ def load_ports_and_airports(
             continue
         mx, my, _ = pt
         hid, cbsa = loc.find(mx, my)
+        st_clean = st if st in STATE_ABBR_TO_FIPS else ""
+        pn_lo = pname.lower()
+        inland_states = {"KY", "WV", "TN", "AR", "MO", "OK", "IA", "NE", "KS", "ID"}
+        gl_states = {"MN", "WI", "MI", "IL", "IN", "OH", "PA", "NY"}
+        gl_kw = ("duluth", "superior", "cleveland", "toledo", "detroit", "chicago", "indiana harbor", "burns", "gary", "milwaukee", "ashtabula", "conneaut", "lorain", "sandusky", "presque", "stoneport", "calcite", "escanaba", "two harbors", "silver bay", "taconite", "st. clair", "buffalo", "monroe", "alpena", "muskegon", "manistee", "ludington", "green bay", "marquette")
+        inland_kw = ("pittsburgh", "huntington", "cincinnati", "st. louis", "memphis", "louisville", "nashville", "chattanooga", "guntersville", "mount vernon", "tulsa", "vicksburg", "greenville", "helena", "baton rouge", "south louisiana", "kansas city", "minneapolis", "st. paul", "paducah", "owensboro")
+        if any(k in pn_lo for k in gl_kw) or (st_clean in gl_states and lat > 41.2 and -93.0 <= lon <= -76.5 and "new york" not in pn_lo and "philadelphia" not in pn_lo and "albany" not in pn_lo):
+            ptype = "great_lakes"
+        elif st_clean in inland_states or any(k in pn_lo for k in inland_kw):
+            ptype = "inland"
+        else:
+            ptype = "coastal"
         ports.append({
             "name": pname,
-            "state": st if st in STATE_ABBR_TO_FIPS else "",
+            "state": st_clean,
+            "port_type": ptype,
             "rank": int(attr.get("RANK") or 0),
             "tons": int(round(tons)),
             "domestic": int(round(float(attr.get("DOMESTIC") or 0))),
@@ -1093,11 +1106,19 @@ def load_military_map(
             ax_b, ay_b = albers_grid.to_albers.transform(lon, lat)
             disp_st = albers_grid.state_at_albers(ax_b, ay_b) or st
 
+        is_airfield = (not bool(_re.search(r"\bAnnex\b", sname, _re.I))) and bool(
+            _re.search(
+                r"\bAir Station\b|\bNAS\b|\bMCAS\b|\bAir Facility\b|\bALF\b|\bN?OLF\b|Outlying (Landing )?Field|Air Field\b|Airfield\b",
+                sname,
+                _re.I,
+            )
+        )
         raw_bases.append({
             "name": sname,
             "component": comp,
             "tier": tier,
             "joint": is_joint,
+            "airfield": is_airfield,
             "status": status,
             "state": disp_st,
             "area_km2": area_km2 if raw_area > 0 else None,
@@ -1221,11 +1242,25 @@ def load_wonders(
         mx, my, _ = pt
         hid, cbsa = loc.find(mx, my)
 
+        # Motif for painted plinth art (exact reference WONDER_MOTIF_BY_ID alignment)
+        park_motifs = {
+            "GRCA": "canyon", "ZION": "canyon", "BRCA": "canyon",
+            "ROMO": "peak", "GLAC": "peak", "GRTE": "peak", "YOSE": "peak", "MORA": "peak", "SEKI": "peak",
+            "GRSM": "forest", "OLYM": "forest", "ACAD": "forest", "CUVA": "forest", "INDU": "forest", "SHEN": "forest",
+            "JOTR": "desert", "SAGU": "desert", "DEVA": "desert",
+            "YELL": "geyser", "HOSP": "geyser",
+            "JEFF": "arch", "NAMA": "obelisk",
+            "GOGA": "bridge", "GATE": "coast", "GUIS": "coast", "CAHA": "coast", "CACO": "coast", "ASIS": "coast",
+            "LAKE": "dam", "GLCA": "dam",
+        }
+        pmotif = park_motifs.get(uc, "peak")
+
         if utype == "National Park" or (utype.startswith("National Park") and "Historical" not in utype):
             park_cands.append({
                 "id": f"nat_{uc.lower()}",
                 "kind": "natural",
                 "rule_id": "national_park",
+                "motif": pmotif,
                 "name": uname_geo or uname,
                 "state": st,
                 "metric": visits,
@@ -1248,6 +1283,7 @@ def load_wonders(
                         "id": "nat_nama",
                         "kind": "natural",
                         "rule_id": "park_unit",
+                        "motif": "obelisk",
                         "name": "National Mall and Memorial Parks",
                         "state": "DC",
                         "metric": visits,
@@ -1264,6 +1300,7 @@ def load_wonders(
                 "id": f"unit_{uc.lower()}",
                 "kind": "natural",
                 "rule_id": "park_unit",
+                "motif": pmotif,
                 "name": uname_geo or uname,
                 "state": st,
                 "metric": visits,
@@ -1385,10 +1422,13 @@ def load_wonders(
                 continue
             seen_uids.add(uid)
             clean_univ_name = info["name"].replace("-Main Campus", "").strip()
+            uni_motifs = ("hall", "redhall", "spire")
+            umotif = uni_motifs[sum(ord(ch) for ch in uid) % 3]
             univ_cands.append({
                 "id": f"acad_{uid}",
                 "kind": "academic",
                 "rule_id": "research_university",
+                "motif": umotif,
                 "name": clean_univ_name,
                 "state": info["state"],
                 "metric": round(rd_musd, 1),
@@ -1417,18 +1457,18 @@ def load_wonders(
 
     # 3. HERITAGE WONDERS — Exact 12 Curated iconic NHL / NPS Landmarks (max 1 per metro, never repeating a park rule)
     iconic_landmarks = [
-        ("Cahokia Mounds", "Cahokia Mounds", "IL", None, "cahokia mounds"),
-        ("Cape Canaveral launch complexes", "Cape Canaveral launch complexes", "FL", None, "cape canaveral"),
-        ("French Quarter (Vieux Carré)", "French Quarter (Vieux Carré)", "LA", None, "vieux carre"),
-        ("Golden Spike", "Golden Spike", "UT", "GOSP", "golden spike"),
-        ("Independence Hall", "Independence Hall", "PA", "INDE", "independence hall"),
-        ("Monticello", "Monticello", "VA", None, "monticello"),
-        ("Mount Rushmore", "Mount Rushmore", "SD", "MORU", "mount rushmore"),
-        ("Statue of Liberty", "Statue of Liberty", "NY", "STLI", "statue of liberty"),
-        ("Taos Pueblo", "Taos Pueblo", "NM", None, "taos pueblo"),
-        ("The Alamo", "The Alamo", "TX", None, "alamo"),
-        ("Wright Brothers National Memorial", "Wright Brothers National Memorial", "NC", "WRBR", "wright brothers"),
-        ("Wrigley Field", "Wrigley Field", "IL", None, "wrigley field"),
+        ("Cahokia Mounds", "Cahokia Mounds", "IL", None, "cahokia mounds", "mound"),
+        ("Cape Canaveral launch complexes", "Cape Canaveral launch complexes", "FL", None, "cape canaveral", "gantry"),
+        ("French Quarter (Vieux Carré)", "French Quarter (Vieux Carré)", "LA", None, "vieux carre", "quarter"),
+        ("Golden Spike", "Golden Spike", "UT", "GOSP", "golden spike", "spike"),
+        ("Independence Hall", "Independence Hall", "PA", "INDE", "independence hall", "brickhall"),
+        ("Monticello", "Monticello", "VA", None, "monticello", "rotunda"),
+        ("Mount Rushmore", "Mount Rushmore", "SD", "MORU", "mount rushmore", "carved"),
+        ("Statue of Liberty", "Statue of Liberty", "NY", "STLI", "statue of liberty", "statue"),
+        ("Taos Pueblo", "Taos Pueblo", "NM", None, "taos pueblo", "adobe"),
+        ("The Alamo", "The Alamo", "TX", None, "alamo", "mission"),
+        ("Wright Brothers National Memorial", "Wright Brothers National Memorial", "NC", "WRBR", "wright brothers", "flight"),
+        ("Wrigley Field", "Wrigley Field", "IL", None, "wrigley field", "ballpark"),
     ]
     nps_by_code = {}
     for feat in nps_cents.get("features", []):
@@ -1444,7 +1484,7 @@ def load_wonders(
         nhl_feats.extend(g.get("features", []))
 
     heritage_found: list[dict] = []
-    for idx_lm, (title, label, want_st, nps_code, nhl_kw) in enumerate(iconic_landmarks, 1):
+    for idx_lm, (title, label, want_st, nps_code, nhl_kw, lmotif) in enumerate(iconic_landmarks, 1):
         lon, lat, st, cert, extra_txt = None, None, want_st, "", ""
         if nps_code and nps_code in nps_by_code:
             lon, lat, st_n, uname_n = nps_by_code[nps_code]
@@ -1487,6 +1527,7 @@ def load_wonders(
             "id": f"her_{idx_lm}",
             "kind": "heritage",
             "rule_id": "landmark",
+            "motif": lmotif,
             "rank": idx_lm,
             "name": label,
             "state": st,

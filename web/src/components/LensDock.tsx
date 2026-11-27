@@ -11,7 +11,15 @@ import {
   X,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
-import { COLOR_RAMPS, formatMetric, LENS_GROUPS, sampleRamp } from '../features/lenses/lensConfig';
+import {
+  COLOR_RAMPS,
+  formatMetric,
+  LENS_GROUPS,
+  lensDomain,
+  lensNorm,
+  lensValueAt,
+  sampleRamp,
+} from '../features/lenses/lensConfig';
 import { localizeLensCategory, localizeLensDesc, localizeLensName, useL } from '../i18n';
 import type { LayerToggles, LensMeta, WorldHexData } from '../types/world';
 
@@ -68,20 +76,17 @@ export const LensDock: React.FC<LensDockProps> = ({ lenses, world }) => {
     [layers],
   );
 
-  // Build real 24-bin histogram across all 18,284 hexes for the active continuous lens!
+  // Build exact 40-bin histogram across all hexes in normalized lensNorm space (log for density & home, linear for others!)
   const histogram = useMemo(() => {
     if (!activeLens || activeLens.categorical) return null;
     const vals = world.lenses[activeLens.id];
     if (!vals) return null;
-    const BINS = 24;
-    const lo0 = activeLens.p02;
-    const hi0 = activeLens.p98;
-    const span = Math.max(1e-9, hi0 - lo0);
+    const BINS = 40;
     const counts = new Array<number>(BINS).fill(0);
     for (let i = 0; i < vals.length; i++) {
       const v = vals[i];
-      if (v === null || v === undefined) continue;
-      const t = Math.max(0, Math.min(0.9999, (v - lo0) / span));
+      if (v === null || v === undefined || Number.isNaN(v)) continue;
+      const t = Math.max(0, Math.min(0.99999, lensNorm(activeLens, v)));
       counts[Math.floor(t * BINS)]++;
     }
     const maxC = Math.max(1, ...counts);
@@ -90,13 +95,26 @@ export const LensDock: React.FC<LensDockProps> = ({ lenses, world }) => {
       return {
         idx: i,
         count,
-        pctH: Math.max(0.08, count / maxC),
-        lo: i === 0 ? activeLens.min : lo0 + (span * i) / BINS,
-        hi: i === BINS - 1 ? activeLens.max : lo0 + (span * (i + 1)) / BINS,
+        pctH: count === 0 ? 0 : Math.max(0.06, Math.sqrt(count / maxC)),
+        lo: i === 0 ? activeLens.min : lensValueAt(activeLens, i / BINS),
+        hi: i === BINS - 1 ? activeLens.max : lensValueAt(activeLens, (i + 1) / BINS),
         color: `rgb(${Math.round(rgb[0] * 255)},${Math.round(rgb[1] * 255)},${Math.round(rgb[2] * 255)})`,
       };
     });
   }, [activeLens, world]);
+
+  const legendTicks = useMemo(() => {
+    if (!activeLens || activeLens.categorical) return [];
+    const [d0] = lensDomain(activeLens);
+    const fracs = [0, 0.25, 0.5, 0.75, 1];
+    return fracs.map((f, idx) => {
+      const val = lensValueAt(activeLens, f);
+      const txt = formatMetric(val, activeLens.format, locale);
+      if (idx === 0) return d0 > 0 ? `≤${txt}` : txt;
+      if (idx === fracs.length - 1) return `≥${txt}`;
+      return txt;
+    });
+  }, [activeLens, locale]);
 
   // Hide lens dock cleanly when right-side City/State/Showdown panel would overlap on narrower screens
   const shiftLeft = (mode === 'city' || mode === 'state' || mode === 'showdown') ? 'right-[470px]' : 'right-3';
@@ -161,11 +179,15 @@ export const LensDock: React.FC<LensDockProps> = ({ lenses, world }) => {
                         <span className="truncate">{localizeLensName(l, locale)}</span>
                         {stops ? (
                           <span
-                            className="w-9 h-2 rounded-sm shrink-0 border border-black/25"
-                            style={{ background: `linear-gradient(90deg, ${stops[0]}, ${stops[2]}, ${stops[5]})` }}
+                            className="w-11 h-2 rounded-sm shrink-0 border border-black/30"
+                            style={{ background: `linear-gradient(90deg, ${stops.join(', ')})` }}
                           />
                         ) : (
-                          <span className="text-[9.5px] opacity-60">{L('分类', 'Cat.')}</span>
+                          <span className="flex items-center gap-[2px] shrink-0">
+                            {['#c8643b', '#e3b23c', '#4f7cc0', '#8a5bb5', '#6aa84f'].map((c) => (
+                              <span key={c} className="w-1.5 h-2 rounded-[1px]" style={{ background: c }} />
+                            ))}
+                          </span>
                         )}
                       </button>
                     );
@@ -232,9 +254,9 @@ export const LensDock: React.FC<LensDockProps> = ({ lenses, world }) => {
             </div>
           ) : histogram && (
             <div className="mt-2.5">
-              {/* 24-bin hoverable & draggable histogram */}
+              {/* 40-bin hoverable & draggable histogram */}
               <div
-                className="flex items-end gap-[2px] h-14 select-none cursor-ew-resize"
+                className="flex items-end gap-[1px] h-14 select-none cursor-ew-resize"
                 onMouseLeave={() => {
                   setHoverBin(null);
                   if (dragStartBinRef.current !== null) dragStartBinRef.current = null;
@@ -264,7 +286,7 @@ export const LensDock: React.FC<LensDockProps> = ({ lenses, world }) => {
                           setBandSlice([b.lo, b.hi]);
                         }
                       }}
-                      className="flex-1 rounded-t-[2px] transition-opacity"
+                      className="flex-1 rounded-t-[1.5px] transition-opacity"
                       style={{
                         height: `${Math.round(b.pctH * 100)}%`,
                         background: b.color,
@@ -275,11 +297,11 @@ export const LensDock: React.FC<LensDockProps> = ({ lenses, world }) => {
                 })}
               </div>
 
-              {/* Scale Ticks */}
-              <div className="flex justify-between text-[10px] font-mono-num opacity-80 mt-1 border-t border-[var(--border-hairline)] pt-1">
-                <span>≤ {formatMetric(activeLens.p02, activeLens.format, locale)}</span>
-                <span>{L('中位', 'Med')} {formatMetric(activeLens.median, activeLens.format, locale)}</span>
-                <span>≥ {formatMetric(activeLens.p98, activeLens.format, locale)}</span>
+              {/* 5-Tick Scale Bar (exact reference domain & log/linear ticks) */}
+              <div className="flex justify-between text-[9.5px] font-mono-num opacity-85 mt-1 border-t border-[var(--border-hairline)] pt-1">
+                {legendTicks.map((tk, i) => (
+                  <span key={i}>{tk}</span>
+                ))}
               </div>
 
               {/* Interactive Footer Status */}

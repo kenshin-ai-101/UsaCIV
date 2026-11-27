@@ -92,6 +92,7 @@ def sample_etopo(hex_df: pl.DataFrame, raw_dir: Path) -> pl.DataFrame:
         print("[etopo] WARNING: no ETOPO1 files found, setting elevation to 0")
         return hex_df.with_columns([
             pl.lit(0.0).alias("elev_m"),
+            pl.lit(0.0).alias("elev_max"),
             pl.lit(0.0).alias("relief_m"),
             pl.lit(0).alias("relief_cls"),
         ])
@@ -113,6 +114,7 @@ def sample_etopo(hex_df: pl.DataFrame, raw_dir: Path) -> pl.DataFrame:
     neigh = all_alt[idxs]
     # Clamp slight negative coastal bathymetry to 0 for land hexes
     elev_mean = np.maximum(0.0, np.mean(neigh, axis=1))
+    elev_max = np.maximum(0.0, np.max(neigh, axis=1))
     elev_range = np.ptp(neigh, axis=1)  # local peak-to-valley relief in meters
 
     # Relief classification: 0 = Flat/Plains, 1 = Hills/Highlands, 2 = Mountains, 3 = Alpine Peaks
@@ -124,15 +126,19 @@ def sample_etopo(hex_df: pl.DataFrame, raw_dir: Path) -> pl.DataFrame:
     print(f"[etopo] Sampled {len(all_alt):,} elevation points -> max hex elev {elev_mean.max():.0f}m, mountains={(relief_cls >= 2).sum():,}")
     return hex_df.with_columns([
         pl.Series("elev_m", np.round(elev_mean, 1)),
+        pl.Series("elev_max", np.round(elev_max, 1)),
         pl.Series("relief_m", np.round(elev_range, 1)),
         pl.Series("relief_cls", relief_cls),
     ])
 
 
 def sample_nlcd(hex_df: pl.DataFrame, raw_dir: Path) -> pl.DataFrame:
-    """Sample NLCD land cover rasters (L48 2021, AK 2016, HI 2001) into 7+ fractional shares per hex."""
+    """Sample NLCD land cover rasters (L48 2021, AK 2016, HI 2001) into 7+ fractional shares and 12-class cover per hex."""
     n = len(hex_df)
     forest = np.full(n, np.nan, dtype=np.float64)
+    decid = np.full(n, np.nan, dtype=np.float64)
+    everg = np.full(n, np.nan, dtype=np.float64)
+    mixed = np.full(n, np.nan, dtype=np.float64)
     crop = np.full(n, np.nan, dtype=np.float64)
     pasture = np.full(n, np.nan, dtype=np.float64)
     farmland = np.full(n, np.nan, dtype=np.float64)
@@ -188,10 +194,13 @@ def sample_nlcd(hex_df: pl.DataFrame, raw_dir: Path) -> pl.DataFrame:
                 tot_all = float(valid.size)
                 water[hi] = float(np.sum(valid == 11)) / tot_all
                 if land.size == 0:
-                    forest[hi] = crop[hi] = pasture[hi] = farmland[hi] = developed[hi] = wetland[hi] = shrub[hi] = grass[hi] = barren[hi] = ice[hi] = 0.0
+                    forest[hi] = decid[hi] = everg[hi] = mixed[hi] = crop[hi] = pasture[hi] = farmland[hi] = developed[hi] = wetland[hi] = shrub[hi] = grass[hi] = barren[hi] = ice[hi] = 0.0
                     continue
                 tot = float(land.size)
-                forest[hi] = float(np.sum(np.isin(land, [41, 42, 43]))) / tot
+                decid[hi] = float(np.sum(land == 41)) / tot
+                everg[hi] = float(np.sum(land == 42)) / tot
+                mixed[hi] = float(np.sum(land == 43)) / tot
+                forest[hi] = decid[hi] + everg[hi] + mixed[hi]
                 crop[hi] = float(np.sum(land == 82)) / tot
                 pasture[hi] = float(np.sum(land == 81)) / tot
                 farmland[hi] = crop[hi] + pasture[hi]
@@ -205,12 +214,18 @@ def sample_nlcd(hex_df: pl.DataFrame, raw_dir: Path) -> pl.DataFrame:
 
         print(f"[nlcd] Sampled region {reg_id} ({len(mask_idx):,} hexes) from {tif_path.name}")
 
-    # Assign primary biome code for tactile terrain rendering:
-    # 0=Grassland/Plains, 1=Farmland, 2=Forest, 3=Desert/Shrub, 4=Wetland, 5=Urban, 6=Tundra/Alpine, 7=Water/Marsh
+    # Assign primary biome code (legacy 0..7) AND exact 12-class NLCD cover code (0..11):
+    # Cover: 0=None, 1=Deciduous, 2=Evergreen, 3=Mixed, 4=Scrub, 5=Grassland, 6=Pasture, 7=Cropland, 8=Wetland, 9=Urban, 10=Barren, 11=Ice
     elev_arr = hex_df["elev_m"].to_numpy()
     biome = np.zeros(n, dtype=np.int32)
+    cover = np.zeros(n, dtype=np.int32)
     for i in range(n):
         f = 0.0 if np.isnan(forest[i]) else forest[i]
+        fd = 0.0 if np.isnan(decid[i]) else decid[i]
+        fe = 0.0 if np.isnan(everg[i]) else everg[i]
+        fm = 0.0 if np.isnan(mixed[i]) else mixed[i]
+        cr = 0.0 if np.isnan(crop[i]) else crop[i]
+        pa = 0.0 if np.isnan(pasture[i]) else pasture[i]
         a = 0.0 if np.isnan(farmland[i]) else farmland[i]
         d = 0.0 if np.isnan(developed[i]) else developed[i]
         w = 0.0 if np.isnan(wetland[i]) else wetland[i]
@@ -237,9 +252,55 @@ def sample_nlcd(hex_df: pl.DataFrame, raw_dir: Path) -> pl.DataFrame:
         elif g >= 0.25 or a >= 0.18:
             biome[i] = 0
         else:
-            # Dominant fallback
             scores = [g, a, f, s + b, w, d, ic]
             biome[i] = int(np.argmax(scores))
+
+        # 12-class NLCD cover code for exact reference terrain color & sprite selection
+        if np.isnan(forest[i]):
+            cover[i] = 0
+        elif ic >= 0.14 or (reg_arr[i] == 1 and lat_arr[i] > 67.0 and ic >= 0.02):
+            cover[i] = 11
+        elif d >= 0.26:
+            cover[i] = 9
+        else:
+            # Group forest together to pick dominant cover family, then split deciduous/evergreen/mixed
+            fam_scores = [
+                (f, "forest"),
+                (s, "scrub"),
+                (g, "grass"),
+                (pa, "pasture"),
+                (cr, "crop"),
+                (w, "wetland"),
+                (d * 1.35, "urban"),
+                (b, "barren"),
+                (ic, "ice"),
+            ]
+            best_fam = max(fam_scores, key=lambda kv: kv[0])[1]
+            if best_fam == "forest":
+                if fd >= fe and fd >= 0.55 * max(f, 1e-6):
+                    cover[i] = 1
+                elif fe >= fd and fe >= 0.55 * max(f, 1e-6):
+                    cover[i] = 2
+                else:
+                    cover[i] = 3
+            elif best_fam == "scrub":
+                cover[i] = 4
+            elif best_fam == "grass":
+                cover[i] = 5
+            elif best_fam == "pasture":
+                cover[i] = 6
+            elif best_fam == "crop":
+                cover[i] = 7
+            elif best_fam == "wetland":
+                cover[i] = 8
+            elif best_fam == "urban":
+                cover[i] = 9
+            elif best_fam == "barren":
+                cover[i] = 10
+            elif best_fam == "ice":
+                cover[i] = 11
+            else:
+                cover[i] = 5
 
     return hex_df.with_columns([
         pl.Series("nlcd_forest", np.round(forest, 4)),
@@ -252,6 +313,7 @@ def sample_nlcd(hex_df: pl.DataFrame, raw_dir: Path) -> pl.DataFrame:
         pl.Series("nlcd_developed", np.round(developed, 4)),
         pl.Series("nlcd_water", np.round(water, 4)),
         pl.Series("biome", biome),
+        pl.Series("cover", cover),
     ])
 
 

@@ -198,7 +198,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   return (
     <header
-      className="fixed top-0 left-0 right-0 h-11 z-40 flex items-center gap-2 px-3 border-b"
+      className="fixed top-0 left-0 right-0 h-11 z-40 flex items-center gap-1.5 px-2.5 border-b"
       style={{
         background: 'var(--surface-paper)',
         borderColor: 'var(--border-strong)',
@@ -302,7 +302,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               aria-expanded={active}
               aria-haspopup="dialog"
               title={item.title}
-              className={`${item.displayClass} items-center gap-1 font-mono-num text-xs font-bold px-2 py-1 rounded-md border transition cursor-pointer whitespace-nowrap ${
+              className={`${item.displayClass} items-center gap-1 font-mono-num text-xs font-bold px-1.5 py-1 rounded-md border transition cursor-pointer whitespace-nowrap ${
                 active
                   ? 'border-[var(--brass)] bg-[var(--brass-soft)] shadow-sm'
                   : 'border-transparent hover:bg-[var(--surface-paper-hover)] hover:border-[var(--border-hairline)]'
@@ -335,7 +335,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       <div className="flex-1" />
 
       {/* Fuzzy Global Search */}
-      <div className="relative w-44 sm:w-56 md:w-64 shrink-0">
+      <div className="relative w-40 sm:w-48 xl:w-56 shrink-0">
         <div
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs"
           style={{ background: 'var(--surface-paper-subtle)', borderColor: 'var(--border-hairline)' }}
@@ -430,7 +430,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       <div className="flex items-center gap-1 shrink-0 whitespace-nowrap">
         <button
           onClick={() => (advActive ? closeSidePanel() : openAdvisor('council'))}
-          className={`dock-btn !py-1 !px-2.5 ${advActive ? 'active' : ''}`}
+          className={`dock-btn !py-1 !px-2 ${advActive ? 'active' : ''}`}
           style={{ borderColor: advActive ? 'var(--brass)' : 'var(--border-hairline)' }}
           title={L('打开 9 位内阁顾问与全美探索器 (Council & Explorer)', 'Open 9 Cabinet Advisors & Explorer')}
         >
@@ -440,7 +440,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         <button
           onClick={() => (mode === 'showdown' ? closeSidePanel() : openShowdown('city'))}
-          className={`dock-btn !py-1 !px-2.5 ${mode === 'showdown' ? 'active' : ''}`}
+          className={`dock-btn !py-1 !px-2 ${mode === 'showdown' ? 'active' : ''}`}
           style={{ borderColor: mode === 'showdown' ? 'var(--brass)' : 'var(--border-hairline)' }}
           title={L('双城 / 双州国力 PK 对决', 'City vs. City / State vs. State Showdown')}
         >
@@ -522,7 +522,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         <button
           onClick={() => setAlmanacOpen(true, 'sources')}
-          className="dock-btn !py-1 !px-2.5"
+          className="dock-btn !py-1 !px-2"
           style={{ borderColor: 'var(--brass)', background: 'var(--brass-soft)', color: 'var(--brass-bright)' }}
           title={L('打开《联邦百科全书》与全部 31 项公开数据源', 'What every number means and where it comes from')}
         >
