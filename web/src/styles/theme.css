@@ -6,7 +6,8 @@
  */
 
 :root,
-html[data-theme="midnight"] {
+html[data-theme="midnight"],
+[data-theme="midnight"] {
   --font-display: "Fraunces", "Noto Serif SC", Georgia, "Songti SC", serif;
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -39,7 +40,8 @@ html[data-theme="midnight"] {
   --y-power: #f2a944;
 }
 
-html[data-theme="daylight"] {
+html[data-theme="daylight"],
+[data-theme="daylight"] {
   --font-display: "Fraunces", "Noto Serif SC", Georgia, "Songti SC", serif;
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;

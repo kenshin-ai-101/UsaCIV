@@ -674,6 +674,7 @@ export const GlobalMilitaryView: React.FC<GlobalMilitaryViewProps> = ({
       {/* Interactive Global Nautical Chart Canvas */}
       <canvas
         ref={canvasRef}
+        data-global-canvas="true"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

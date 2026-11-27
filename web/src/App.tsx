@@ -84,6 +84,7 @@ export default function App() {
   const globalMilFetchedRef = useRef(false);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [exportingPng, setExportingPng] = useState(false);
 
   const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; picked: PickedItem | null }>({
     x: 0,
@@ -92,6 +93,7 @@ export default function App() {
   });
   const [camTick, setCamTick] = useState(0);
 
+  const appRootRef = useRef<HTMLDivElement>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
   const glCanvasRef = useRef<HTMLCanvasElement>(null);
   const fgCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -774,23 +776,86 @@ export default function App() {
     requestDraw();
   };
 
-  const exportPng = useCallback(() => {
-    const bg = bgCanvasRef.current, gl = glCanvasRef.current, fg = fgCanvasRef.current;
-    if (!bg || !gl || !fg) return;
-    const out = document.createElement('canvas');
-    out.width = bg.width;
-    out.height = bg.height;
-    const ctx = out.getContext('2d');
-    if (!ctx) return;
-    ctx.drawImage(bg, 0, 0);
-    ctx.drawImage(gl, 0, 0);
-    ctx.drawImage(fg, 0, 0);
-    const a = document.createElement('a');
-    a.download = `terra-americana-${activeLens?.id ?? 'terrain'}.png`;
-    a.href = out.toDataURL('image/png');
-    a.click();
-    showToast(L('已导出高清地图 PNG 快照', 'Exported HD map PNG snapshot'));
-  }, [activeLens, showToast, locale]);
+  const exportPng = useCallback(async () => {
+    if (exportingPng) return;
+    setExportingPng(true);
+
+    const slug = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/[^a-z0-9\u4e00-\u9fff]+/gi, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 32) || 'view';
+    const now = new Date();
+    const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+    const viewTag =
+      mapView === 'global'
+        ? 'global-bases'
+        : mode === 'city' && selectedCity
+          ? `city-${slug(selectedCity.short_name)}`
+          : mode === 'state' && selectedState
+            ? `state-${selectedState.abbr.toLowerCase()}`
+            : mode === 'advisor'
+              ? `advisor-${activeAdvisorId}`
+              : mode === 'explorer' || mode === 'showdown'
+                ? mode
+                : activeLens?.id ?? 'terrain';
+    const filename = `terra-americana-${viewTag}-${stamp}.png`;
+
+    const triggerDownload = (dataUrl: string) => {
+      const a = document.createElement('a');
+      a.download = filename;
+      a.href = dataUrl;
+      a.click();
+    };
+
+    try {
+      const target = appRootRef.current;
+      if (!target) return;
+      // Wait a frame so current view / canvas buffers are settled
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+      const { domToPng } = await import('modern-screenshot');
+      const dataUrl = await domToPng(target, {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        scale: Math.max(2, Math.min(3, window.devicePixelRatio || 2)),
+        backgroundColor: theme === 'midnight' ? '#0c1724' : '#a2c0cf',
+        filter: (node) => !(node instanceof HTMLElement && node.dataset.exportIgnore === 'true'),
+        fetch: {
+          requestInit: { mode: 'cors' },
+        },
+      });
+      triggerDownload(dataUrl);
+      showToast(L('已导出当前页面高清 PNG 海报', 'Exported HD PNG poster of current page'));
+    } catch {
+      // Fallback: composite whichever map canvas is currently active (Global OR U.S.)
+      if (mapView === 'global') {
+        const gcv = document.querySelector<HTMLCanvasElement>('canvas[data-global-canvas="true"]');
+        if (gcv) {
+          triggerDownload(gcv.toDataURL('image/png'));
+          showToast(L('已导出当前海图高清 PNG', 'Exported current chart HD PNG'));
+        }
+      } else {
+        const bg = bgCanvasRef.current, gl = glCanvasRef.current, fg = fgCanvasRef.current;
+        if (bg && gl && fg) {
+          const out = document.createElement('canvas');
+          out.width = bg.width;
+          out.height = bg.height;
+          const ctx = out.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(bg, 0, 0);
+            ctx.drawImage(gl, 0, 0);
+            ctx.drawImage(fg, 0, 0);
+            triggerDownload(out.toDataURL('image/png'));
+            showToast(L('已导出当前地图高清 PNG', 'Exported current map HD PNG'));
+          }
+        }
+      }
+    } finally {
+      setExportingPng(false);
+    }
+  }, [exportingPng, mapView, mode, selectedCity, selectedState, activeAdvisorId, activeLens, theme, showToast, locale]);
 
   const copyShareLink = useCallback(() => {
     navigator.clipboard?.writeText(window.location.href).catch(() => {});
@@ -821,11 +886,20 @@ export default function App() {
   }
 
   return (
-    <div className="relative w-full h-full overflow-hidden select-none">
-      <canvas ref={bgCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
-      <canvas ref={glCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
+    <div ref={appRootRef} data-theme={theme} className="relative w-full h-full overflow-hidden select-none">
+      <canvas
+        ref={bgCanvasRef}
+        data-export-ignore={mapView === 'global' ? 'true' : undefined}
+        className="absolute inset-0 w-full h-full pointer-events-none"
+      />
+      <canvas
+        ref={glCanvasRef}
+        data-export-ignore={mapView === 'global' ? 'true' : undefined}
+        className="absolute inset-0 w-full h-full pointer-events-none"
+      />
       <canvas
         ref={fgCanvasRef}
+        data-export-ignore={mapView === 'global' ? 'true' : undefined}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -855,6 +929,7 @@ export default function App() {
         onFlyTo={flyTo}
         onResetView={resetView}
         onExportPng={exportPng}
+        exportingPng={exportingPng}
         onCopyShareLink={copyShareLink}
       />
 
@@ -936,7 +1011,10 @@ export default function App() {
       <HelpModal />
 
       {toast && (
-        <div className="atlas-panel-brass fixed top-14 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-xs font-semibold">
+        <div
+          data-export-ignore="true"
+          className="atlas-panel-brass fixed top-14 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-xs font-semibold"
+        >
           {toast}
         </div>
       )}

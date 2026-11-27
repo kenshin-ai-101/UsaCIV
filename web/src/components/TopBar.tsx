@@ -5,6 +5,7 @@ import {
   Globe,
   HelpCircle,
   Landmark,
+  Loader2,
   Moon,
   Scale,
   Search,
@@ -26,6 +27,7 @@ interface TopBarProps {
   onFlyTo: (x: number, y: number, scale: number) => void;
   onResetView: () => void;
   onExportPng: () => void;
+  exportingPng?: boolean;
   onCopyShareLink: () => void;
 }
 
@@ -38,6 +40,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onFlyTo,
   onResetView,
   onExportPng,
+  exportingPng = false,
   onCopyShareLink,
 }) => {
   const { locale, L } = useL();
@@ -531,11 +534,17 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         <button
           onClick={onExportPng}
-          className="dock-btn !p-1.5 hidden md:inline-flex"
+          disabled={exportingPng}
+          className="dock-btn !p-1.5 hidden md:inline-flex disabled:opacity-55"
           style={{ borderColor: 'var(--border-hairline)' }}
-          title={L('导出高清 PNG 地图海报', 'Export HD PNG map snapshot')}
+          title={L('导出当前页面高清 PNG 海报', 'Export HD PNG poster of current page')}
+          aria-label={L('导出当前页面高清 PNG 海报', 'Export HD PNG poster of current page')}
         >
-          <CameraIcon className="w-3.5 h-3.5" />
+          {exportingPng ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--brass-bright)' }} />
+          ) : (
+            <CameraIcon className="w-3.5 h-3.5" />
+          )}
         </button>
 
         <button
