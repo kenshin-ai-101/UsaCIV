@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BookOpen,
   Camera as CameraIcon,
+  Globe,
   HelpCircle,
   Landmark,
   Moon,
@@ -44,6 +45,9 @@ export const TopBar: React.FC<TopBarProps> = ({
     theme,
     toggleTheme,
     setLocale,
+    mapView,
+    setMapView,
+    toggleMapView,
     mode,
     openCity,
     openState,
@@ -335,7 +339,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       <div className="flex-1" />
 
       {/* Fuzzy Global Search */}
-      <div className="relative w-40 sm:w-48 xl:w-56 shrink-0">
+      <div className="relative w-36 sm:w-44 2xl:w-56 shrink-0">
         <div
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs"
           style={{ background: 'var(--surface-paper-subtle)', borderColor: 'var(--border-hairline)' }}
@@ -364,6 +368,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                   setQuery('');
                   setSearchFocused(false);
                   inputRef.current?.blur();
+                  if (mapView === 'global') setMapView('us');
                   if (item.kind === 'city') openCity(item.id);
                   else if (item.kind === 'state') openState(item.id);
                   else onFlyTo(item.x, item.y, 1.45);
@@ -405,6 +410,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                 onMouseDown={() => {
                   setQuery('');
                   setSearchFocused(false);
+                  if (mapView === 'global') setMapView('us');
                   if (item.kind === 'city') openCity(item.id);
                   else if (item.kind === 'state') openState(item.id);
                   else onFlyTo(item.x, item.y, 1.45);
@@ -429,9 +435,13 @@ export const TopBar: React.FC<TopBarProps> = ({
       {/* Right Command Buttons */}
       <div className="flex items-center gap-1 shrink-0 whitespace-nowrap">
         <button
-          onClick={() => (advActive ? closeSidePanel() : openAdvisor('council'))}
-          className={`dock-btn !py-1 !px-2 ${advActive ? 'active' : ''}`}
-          style={{ borderColor: advActive ? 'var(--brass)' : 'var(--border-hairline)' }}
+          onClick={() => {
+            if (mapView === 'global') setMapView('us');
+            if (advActive && mapView === 'us') closeSidePanel();
+            else openAdvisor('council');
+          }}
+          className={`dock-btn !py-1 !px-2 ${advActive && mapView === 'us' ? 'active' : ''}`}
+          style={{ borderColor: advActive && mapView === 'us' ? 'var(--brass)' : 'var(--border-hairline)' }}
           title={L('打开 9 位内阁顾问与全美探索器 (Council & Explorer)', 'Open 9 Cabinet Advisors & Explorer')}
         >
           <Landmark className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--brass-bright)' }} />
@@ -439,9 +449,27 @@ export const TopBar: React.FC<TopBarProps> = ({
         </button>
 
         <button
-          onClick={() => (mode === 'showdown' ? closeSidePanel() : openShowdown('city'))}
-          className={`dock-btn !py-1 !px-2 ${mode === 'showdown' ? 'active' : ''}`}
-          style={{ borderColor: mode === 'showdown' ? 'var(--brass)' : 'var(--border-hairline)' }}
+          onClick={toggleMapView}
+          className={`dock-btn !py-1 !px-2 ${mapView === 'global' ? 'active' : ''}`}
+          style={{ borderColor: mapView === 'global' ? 'var(--brass)' : 'var(--border-hairline)' }}
+          title={
+            mapView === 'global'
+              ? L('切回美国本土 25 km 六边形沙盘', 'Switch back to U.S. 25 km Hex Map')
+              : L('切换至全球投射海图：各大洲与各大洋 498 座海外美军基地与 49 驻军地', 'Switch to Global Force Projection Chart: 498 overseas U.S. bases & 49 host territories')
+          }
+        >
+          <Globe className="w-3.5 h-3.5 shrink-0" style={{ color: mapView === 'global' ? 'var(--brass-bright)' : '#6FB3E0' }} />
+          <span className="hidden sm:inline">{mapView === 'global' ? L('美国六角图', 'U.S. Map') : L('全球基地', 'Global')}</span>
+        </button>
+
+        <button
+          onClick={() => {
+            if (mapView === 'global') setMapView('us');
+            if (mode === 'showdown' && mapView === 'us') closeSidePanel();
+            else openShowdown('city');
+          }}
+          className={`dock-btn !py-1 !px-2 ${mode === 'showdown' && mapView === 'us' ? 'active' : ''}`}
+          style={{ borderColor: mode === 'showdown' && mapView === 'us' ? 'var(--brass)' : 'var(--border-hairline)' }}
           title={L('双城 / 双州国力 PK 对决', 'City vs. City / State vs. State Showdown')}
         >
           <Scale className="w-3.5 h-3.5 shrink-0" />
@@ -498,7 +526,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           title={L('复制当前视图分享链接', 'Copy shareable link to current view')}
         >
           <Share2 className="w-3.5 h-3.5" />
-          <span className="hidden xl:inline">{L('分享', 'Share')}</span>
+          <span className="hidden 2xl:inline">{L('分享', 'Share')}</span>
         </button>
 
         <button

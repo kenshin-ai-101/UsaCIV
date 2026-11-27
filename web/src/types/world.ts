@@ -623,3 +623,161 @@ export interface LayerToggles {
   borders: boolean;
   banners: boolean;
 }
+
+export interface GlobalBaseRecord {
+  id: string;
+  name: string;
+  country: string;
+  country_raw: string;
+  city: string;
+  component: string;
+  branch: 'army' | 'navy' | 'air_force' | 'marines' | 'reserve_guard';
+  cocom: string;
+  region: string;
+  lat: number;
+  lon: number;
+  prv_musd: number;
+  acres: number;
+  buildings: number;
+  bldgs_owned?: number;
+  bldgs_leased?: number;
+  sqft?: number;
+  approx_coord?: boolean;
+  note?: string;
+  tier: 'hub' | 'major' | 'site';
+}
+
+export interface GlobalCountryRecord {
+  name: string;
+  iso2: string;
+  cocom: string;
+  region: string;
+  presence_type?: 'base_host' | 'deployed_mission';
+  mission_note_zh?: string;
+  mission_note_en?: string;
+  lat: number | null;
+  lon: number | null;
+  active: number;
+  reserve: number;
+  civilian: number;
+  total: number;
+  by_branch: {
+    army: number;
+    navy: number;
+    marines: number;
+    air_force: number;
+    space_force: number;
+    coast_guard: number;
+  };
+  base_count: number;
+  prv_musd: number;
+}
+
+export interface CocomSummary {
+  id: string;
+  name_zh: string;
+  name_en: string;
+  hq_zh?: string;
+  hq_en?: string;
+  subtitle_zh: string;
+  subtitle_en: string;
+  color: string;
+  box: [number, number, number, number];
+  label_lon?: number;
+  label_lat?: number;
+  base_count: number;
+  hub_count: number;
+  prv_musd: number;
+  active_troops: number;
+  total_personnel: number;
+  country_count: number;
+}
+
+export interface NavyFleetRecord {
+  id: string;
+  name_en: string;
+  name_zh: string;
+  hq_en: string;
+  hq_zh: string;
+  cocom: string;
+  lon: number;
+  lat: number;
+}
+
+export interface ChokepointRecord {
+  id: string;
+  name_en: string;
+  name_zh: string;
+  lon: number;
+  lat: number;
+}
+
+export interface OceanLabel {
+  id: string;
+  name_en: string;
+  name_zh: string;
+  lon: number;
+  lat: number;
+  size: 'lg' | 'md' | 'sm';
+}
+
+export interface ProjectionArc {
+  id: string;
+  from_name: string;
+  from_lon: number;
+  from_lat: number;
+  to_name: string;
+  to_lon: number;
+  to_lat: number;
+  cocom: string;
+}
+
+export interface WorldLandFeature {
+  iso2: string;
+  name: string;
+  continent: string;
+  cocom: string;
+  lat: number;
+  lon: number;
+  is_us: boolean;
+  is_host?: boolean;
+  active: number;
+  base_count: number;
+  polys: [number, number][][];
+}
+
+export interface GlobalMilitaryDataset {
+  summary: {
+    total_bases: number;
+    missing_coord_bases: number;
+    excluded_bases?: number;
+    fixed_coord_bases?: number;
+    base_countries: number;
+    host_countries?: number;
+    total_prv_musd: number;
+    total_acres: number;
+    host_active?: number;
+    host_reserve?: number;
+    host_civilian?: number;
+    overseas_active: number;
+    overseas_reserve: number;
+    overseas_civilian: number;
+    embassy_only_countries?: number;
+    embassy_only_active?: number;
+    unassigned_active: number;
+    unassigned_reserve: number;
+    unassigned_civilian: number;
+    dmdc_countries?: number;
+    as_of_dmdc: string;
+    as_of_bsr: string;
+  };
+  cocoms: CocomSummary[];
+  fleets?: NavyFleetRecord[];
+  chokepoints?: ChokepointRecord[];
+  ocean_labels: OceanLabel[];
+  projection_arcs: ProjectionArc[];
+  bases: GlobalBaseRecord[];
+  countries: GlobalCountryRecord[];
+  world_land: WorldLandFeature[];
+  world_lakes?: [number, number][][];
+}

@@ -1007,7 +1007,10 @@ export function SortableTable<T extends { id: string }>({
   return (
     <div className="rounded-lg border border-[var(--border-hairline)] overflow-hidden bg-black/20">
       {searchPlaceholder && (
-        <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-[var(--border-hairline)] bg-black/25">
+        <div
+          className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-[var(--border-hairline)]"
+          style={{ background: 'var(--surface-paper-subtle)' }}
+        >
           <Search className="w-3 h-3 opacity-50 shrink-0" />
           <input
             value={q}
@@ -1029,7 +1032,10 @@ export function SortableTable<T extends { id: string }>({
         style={{ maxHeight }}
       >
         <table className="w-full text-[11px] border-collapse">
-          <thead className="sticky top-0 z-10 bg-[#131c28] border-b border-[var(--border-hairline)]">
+          <thead
+            className="sticky top-0 z-10 border-b border-[var(--border-hairline)]"
+            style={{ background: 'var(--surface-paper)' }}
+          >
             <tr>
               {ranked && <th className="py-1.5 pl-2 pr-1 text-left opacity-45 font-mono-num w-8">#</th>}
               {columns.map((c) => (

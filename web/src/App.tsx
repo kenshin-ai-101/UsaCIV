@@ -22,10 +22,12 @@ import { StatePanel } from './features/city/StatePanel';
 import { AdvisorsPanel } from './features/advisors/AdvisorsPanel';
 import { CountyExplorerPanel } from './features/explorer/CountyExplorerPanel';
 import { ShowdownPanel } from './features/showdown/ShowdownPanel';
+import { GlobalMilitaryView } from './features/global/GlobalMilitaryView';
 import { AlmanacModal, HelpModal, YieldReportModal } from './features/almanac/AlmanacModal';
 import type {
   CityRecord,
   CountiesDataset,
+  GlobalMilitaryDataset,
   MapLayersData,
   StateRecord,
   TradeRouteNode,
@@ -37,6 +39,7 @@ export default function App() {
   const { locale, L } = useL();
   const {
     theme,
+    mapView,
     mode,
     activeLensId,
     bandSlice,
@@ -66,6 +69,7 @@ export default function App() {
     setHelpOpen,
     setYieldReportOpen,
     setActiveTopMetric,
+    setMapView,
   } = useAppStore();
 
   const [meta, setMeta] = useState<WorldMeta | null>(null);
@@ -74,6 +78,10 @@ export default function App() {
   const [states, setStates] = useState<StateRecord[]>([]);
   const [layersData, setLayersData] = useState<MapLayersData | null>(null);
   const [countiesData, setCountiesData] = useState<CountiesDataset | null>(null);
+  const [globalMilData, setGlobalMilData] = useState<GlobalMilitaryDataset | null>(null);
+  const [globalMilLoading, setGlobalMilLoading] = useState(false);
+  const [globalMilErr, setGlobalMilErr] = useState<string | null>(null);
+  const globalMilFetchedRef = useRef(false);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -147,6 +155,7 @@ export default function App() {
           useAppStore.getState().setLocale(hash.get('lang') as 'en' | 'zh');
         }
         if (hash.get('theme') === 'daylight') useAppStore.getState().setTheme('daylight');
+        if (hash.get('view') === 'global') useAppStore.getState().setMapView('global');
         if (hash.get('trade') === '1') useAppStore.getState().setLayer('trade', true);
         if (hash.get('lens')) useAppStore.getState().setLens(hash.get('lens'));
         if (hash.get('city')) useAppStore.getState().openCity(hash.get('city')!);
@@ -176,20 +185,47 @@ export default function App() {
     };
   }, []);
 
+  // Lazy-load global_military.json the first time the user enters Global Bases view
+  useEffect(() => {
+    if (mapView !== 'global' || globalMilFetchedRef.current) return;
+    globalMilFetchedRef.current = true;
+    setGlobalMilLoading(true);
+    setGlobalMilErr(null);
+    fetch('/data/global_military.json')
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return (await res.json()) as GlobalMilitaryDataset;
+      })
+      .then((d) => {
+        setGlobalMilData(d);
+      })
+      .catch((err) => {
+        globalMilFetchedRef.current = false;
+        setGlobalMilErr(String(err));
+      })
+      .finally(() => {
+        setGlobalMilLoading(false);
+      });
+  }, [mapView]);
+
   useEffect(() => {
     if (!hashHydratedRef.current) return;
     const p = new URLSearchParams();
     if (locale === 'en') p.set('lang', 'en');
     if (theme === 'daylight') p.set('theme', 'daylight');
-    if (activeLensId) p.set('lens', activeLensId);
-    if (mode === 'city' && selectedCityId) p.set('city', selectedCityId);
-    else if (mode === 'state' && selectedStateFips) p.set('state', selectedStateFips);
-    else if (mode === 'advisor') p.set('advisor', activeAdvisorId);
-    else if (mode === 'explorer') p.set('advisor', 'explorer');
-    else if (mode === 'showdown') p.set('mode', 'showdown');
+    if (mapView === 'global') {
+      p.set('view', 'global');
+    } else {
+      if (activeLensId) p.set('lens', activeLensId);
+      if (mode === 'city' && selectedCityId) p.set('city', selectedCityId);
+      else if (mode === 'state' && selectedStateFips) p.set('state', selectedStateFips);
+      else if (mode === 'advisor') p.set('advisor', activeAdvisorId);
+      else if (mode === 'explorer') p.set('advisor', 'explorer');
+      else if (mode === 'showdown') p.set('mode', 'showdown');
+    }
     const s = p.toString();
     window.history.replaceState(null, '', s ? `#${s}` : window.location.pathname);
-  }, [locale, theme, activeLensId, mode, selectedCityId, selectedStateFips, activeAdvisorId]);
+  }, [locale, theme, mapView, activeLensId, mode, selectedCityId, selectedStateFips, activeAdvisorId]);
 
   const activeLens = useMemo(
     () => (meta && activeLensId ? meta.lenses.find((l) => l.id === activeLensId) ?? null : null),
@@ -254,10 +290,11 @@ export default function App() {
 
   const resetView = useCallback(() => {
     if (!meta) return;
+    if (useAppStore.getState().mapView === 'global') setMapView('us');
     closeSidePanel();
     cameraRef.current.fitBounds(meta.bounds_km, { padTop: 56, padBottom: 74, animate: true });
     requestDraw();
-  }, [meta, closeSidePanel, requestDraw]);
+  }, [meta, setMapView, closeSidePanel, requestDraw]);
 
   useEffect(() => {
     if (!meta || !world || !glCanvasRef.current) return;
@@ -436,8 +473,10 @@ export default function App() {
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
-      const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
       const st = useAppStore.getState();
+      // GlobalMilitaryView owns keyboard pan/zoom/Esc when active
+      if (st.mapView === 'global') return;
+      const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
 
       if (k === 'Escape') {
         if (isTyping(e.target)) {
@@ -808,41 +847,54 @@ export default function App() {
         onCopyShareLink={copyShareLink}
       />
 
-      <LensDock lenses={meta.lenses} world={world} />
+      {mapView === 'global' && (
+        <GlobalMilitaryView
+          meta={meta}
+          dataset={globalMilData}
+          loading={globalMilLoading}
+          error={globalMilErr}
+        />
+      )}
 
-      <Minimap
-        world={world}
-        meta={meta}
-        activeLens={activeLens}
-        cameraRef={cameraRef}
-        camTick={camTick}
-        onJump={(wx, wy, immediate) => {
-          if (immediate) {
-            cameraRef.current.jumpToWorld(wx, wy);
-            requestDraw();
-          } else {
-            flyTo(wx, wy, Math.max(0.55, cameraRef.current.scale));
-          }
-        }}
-      />
+      {mapView === 'us' && <LensDock lenses={meta.lenses} world={world} />}
 
-      <MapTooltip
-        x={hoverInfo.x}
-        y={hoverInfo.y}
-        picked={hoverInfo.picked}
-        world={world}
-        activeLens={activeLens}
-        countyByFips={countyByFips}
-        stateByFips={stateByFips}
-      />
+      {mapView === 'us' && (
+        <Minimap
+          world={world}
+          meta={meta}
+          activeLens={activeLens}
+          cameraRef={cameraRef}
+          camTick={camTick}
+          onJump={(wx, wy, immediate) => {
+            if (immediate) {
+              cameraRef.current.jumpToWorld(wx, wy);
+              requestDraw();
+            } else {
+              flyTo(wx, wy, Math.max(0.55, cameraRef.current.scale));
+            }
+          }}
+        />
+      )}
 
-      {mode === 'city' && selectedCity && (
+      {mapView === 'us' && (
+        <MapTooltip
+          x={hoverInfo.x}
+          y={hoverInfo.y}
+          picked={hoverInfo.picked}
+          world={world}
+          activeLens={activeLens}
+          countyByFips={countyByFips}
+          stateByFips={stateByFips}
+        />
+      )}
+
+      {mapView === 'us' && mode === 'city' && selectedCity && (
         <CityCommandPanel city={selectedCity} allCities={cities} meta={meta} layers={layersData} onFlyTo={flyTo} />
       )}
-      {mode === 'state' && selectedState && (
+      {mapView === 'us' && mode === 'state' && selectedState && (
         <StatePanel state={selectedState} cities={cities} />
       )}
-      {mode === 'advisor' && (
+      {mapView === 'us' && mode === 'advisor' && (
         <AdvisorsPanel
           meta={meta}
           world={world}
@@ -853,7 +905,7 @@ export default function App() {
           onFlyTo={flyTo}
         />
       )}
-      {mode === 'explorer' && (
+      {mapView === 'us' && mode === 'explorer' && (
         <CountyExplorerPanel
           meta={meta}
           dataset={countiesData}
@@ -863,7 +915,7 @@ export default function App() {
           onFlyTo={flyTo}
         />
       )}
-      {mode === 'showdown' && <ShowdownPanel cities={cities} states={states} />}
+      {mapView === 'us' && mode === 'showdown' && <ShowdownPanel cities={cities} states={states} />}
 
       <AlmanacModal meta={meta} />
       <YieldReportModal cities={cities} states={states} />

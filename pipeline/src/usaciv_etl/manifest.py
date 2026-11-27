@@ -679,4 +679,20 @@ SOURCES: list[DataSourceSpec] = [
             SourceFile("usrc_2020/RCMSCY20.xlsx", "https://osf.io/download/5a6sk/"),
         ),
     ),
+    # 32. DoD Base Structure Report Overseas Installations (Geocoded via The US Base Project)
+    DataSourceSpec(
+        id="dod_bsr_overseas",
+        category="military",
+        title="DoD Base Structure Report — Overseas & Territory Installations (Geocoded via The US Base Project)",
+        publisher="U.S. DoD / The US Base Project",
+        homepage="https://usbaseproject.com/data/",
+        vintage="FY2024 BSR",
+        used_for="Global overseas & territory U.S. military base coordinates, plant replacement value ($M), acreage & service branch (Global Bases Map)",
+        files=(
+            SourceFile(
+                "overseas_bases/bsr_fy24_lat_long.xlsx",
+                "https://usbaseproject.com/wp-content/uploads/2024/11/BSR-FY24_Lat-Long.xlsx",
+            ),
+        ),
+    ),
 ]

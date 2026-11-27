@@ -845,7 +845,7 @@ const COMP_GROUPS = [
 
 export const MilitaryView: React.FC<AdvisorViewProps> = ({ meta, cities, states, allStates, layers, counties, stateHexMap, geoScope, onFlyTo }) => {
   const { locale, isEn, L } = useL();
-  const { setLens, setLayer, setBrushed, setAdvisorVisuals, setHoveredBubbleId, openCity, openState } = useAppStore();
+  const { setLens, setLayer, setBrushed, setAdvisorVisuals, setHoveredBubbleId, openCity, openState, setMapView } = useAppStore();
   const [mapMode, setMapMode] = useState<'terrain' | 'veterans'>('terrain');
   const [tier, setTier] = useState<'major' | 'big' | 'all'>('big');
   const [compSet, setCompSet] = useState<Set<string> | null>(null);
@@ -974,6 +974,22 @@ export const MilitaryView: React.FC<AdvisorViewProps> = ({ meta, cities, states,
           { label: L('退伍军人', 'Veterans'), value: fmtCount3(meta.nation.veterans_total ?? 16185883), sub: L('18岁+ 平民 (ACS 5-Yr)', 'Civilians 18+ (ACS 5-Yr)') },
         ]}
       />
+
+      <button
+        type="button"
+        onClick={() => setMapView('global')}
+        className="w-full p-2.5 rounded-xl border border-[var(--brass)] bg-[var(--brass-soft)] hover:brightness-110 transition flex items-center justify-between gap-2 text-left cursor-pointer"
+      >
+        <div className="min-w-0">
+          <div className="text-[11px] font-bold" style={{ color: 'var(--brass-bright)' }}>
+            🌐 {L('切换至全球投射海图 · 498 座海外基地 & 49 部署国', 'Open Global Force Projection · 498 Overseas Bases & 49 Hosts')}
+          </div>
+          <div className="text-[10px] opacity-80 mt-0.5">
+            {L('查看六大战区、六大编号舰队、498 座在运海外基地及 162.7K 实质驻军（已剔除使馆警卫）', 'Explore 6 Combatant Commands, 6 Navy Fleets, 498 audited bases & 162.7K stationed troops (excl. embassy guards)')}
+          </div>
+        </div>
+        <span className="text-xs font-bold shrink-0" style={{ color: 'var(--brass-bright)' }}>→</span>
+      </button>
 
       <CalloutNote>
         {L(

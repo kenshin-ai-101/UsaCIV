@@ -598,7 +598,171 @@ const SOURCE_USED_FOR_ZH: Record<string, string> = {
   pep_population: '多年人口净增长与迁徙拆解（自然增减、国内/国际净迁入）',
   usace_ports: '航运海港节点、总吞吐短吨排行与商贸顾问',
   usrc_2020: '信仰产出、宗教信徒率视角、第一大宗教传统视角与文化顾问',
+  dod_bsr_overseas: '全球 498 座活跃海外与领地美军基地精确经纬度（含坐标纠偏）、DoD 设施重置估值 ($M)、占地面积与军种（全球基地海图）',
 };
+
+/* ── Global Overseas Bases Localization ───────────────────────────────────── */
+const GLOBAL_BRANCH_LABELS: Record<Locale, Record<string, string>> = {
+  zh: {
+    army: '陆军',
+    navy: '海军',
+    air_force: '空军',
+    marines: '海军陆战队',
+    reserve_guard: '预备役 / 国民警卫队',
+  },
+  en: {
+    army: 'Army',
+    navy: 'Navy',
+    air_force: 'Air Force',
+    marines: 'Marine Corps',
+    reserve_guard: 'Reserve / Guard',
+  },
+};
+
+export function localizeGlobalBranch(branch: string, locale: Locale): string {
+  return GLOBAL_BRANCH_LABELS[locale][branch] ?? branch;
+}
+
+const GLOBAL_COMPONENT_ZH: Record<string, string> = {
+  'Army Active': '陆军现役',
+  'Navy Active': '海军现役',
+  'Air Force Active': '空军现役',
+  'Marine Corps Active': '海军陆战队现役',
+  'Army Reserve': '陆军预备役',
+  'Navy Reserve': '海军预备役',
+  'Army National Guard': '陆军国民警卫队',
+};
+
+export function localizeGlobalComponent(comp: string, locale: Locale): string {
+  if (locale === 'en') return comp;
+  return GLOBAL_COMPONENT_ZH[comp] ?? comp;
+}
+
+const GLOBAL_REGION_ZH: Record<string, string> = {
+  'Pacific Ocean': '太平洋',
+  'Indian Ocean': '印度洋',
+  'Pacific & Indian Oceans': '太平洋与印度洋',
+  'Indian & Pacific Gateway': '印太咽喉（马六甲）',
+  'Indo-Pacific': '印太地区',
+  'Europe': '欧洲大陆',
+  'Mediterranean / Europe': '地中海与南欧',
+  'Atlantic / Europe': '大西洋与西欧',
+  'Atlantic / Mediterranean': '大西洋与地中海',
+  'Eastern Mediterranean': '东地中海',
+  'Mediterranean': '地中海',
+  'Black Sea / Europe': '黑海与东欧',
+  'Atlantic Ocean': '大西洋',
+  'Arctic / North Atlantic': '北极与北大西洋',
+  'North Atlantic': '北大西洋',
+  'Arctic Ocean': '北冰洋',
+  'Persian Gulf': '波斯湾',
+  'Middle East': '中东',
+  'Middle East & Central Asia': '中东与中亚',
+  'Arabian Sea / Indian Ocean': '阿拉伯海与印度洋',
+  'Red Sea / Suez': '红海与苏伊士',
+  'Horn of Africa / Red Sea': '非洲之角与红海',
+  'East Africa / Indian Ocean': '东非与印度洋',
+  'West Africa': '西非',
+  'Southern Africa': '南部非洲',
+  'Africa': '非洲',
+  'South Atlantic Ocean': '南大西洋',
+  'Caribbean Sea': '加勒比海',
+  'Caribbean / Atlantic': '加勒比海与大西洋',
+  'Atlantic / Caribbean': '大西洋与加勒比海',
+  'Central America': '中美洲',
+  'Central America & Caribbean': '中美洲与加勒比',
+  'South America': '南美洲',
+  'North America / Arctic': '北美与北极',
+  'North America': '北美洲',
+  'Global': '全球',
+};
+
+export function localizeGlobalRegion(region: string, locale: Locale): string {
+  if (locale === 'en') return region;
+  return GLOBAL_REGION_ZH[region] ?? region;
+}
+
+const GLOBAL_COUNTRY_ZH: Record<string, string> = {
+  'American Samoa': '美属萨摩亚',
+  'Ascension Island (UK)': '阿森松岛（英属）',
+  Australia: '澳大利亚',
+  Bahrain: '巴林',
+  Belgium: '比利时',
+  Bulgaria: '保加利亚',
+  Canada: '加拿大',
+  'Cuba (Guantanamo Bay)': '古巴（关塔那摩）',
+  Curacao: '库拉索',
+  Cyprus: '塞浦路斯',
+  'Diego Garcia (BIOT)': '迪戈加西亚（英属印度洋）',
+  Djibouti: '吉布提',
+  Egypt: '埃及',
+  'El Salvador': '萨尔瓦多',
+  Germany: '德国',
+  Greece: '希腊',
+  Greenland: '格陵兰',
+  Guam: '关岛',
+  Honduras: '洪都拉斯',
+  Hungary: '匈牙利',
+  Iceland: '冰岛',
+  Israel: '以色列',
+  Italy: '意大利',
+  Japan: '日本',
+  'Johnston Atoll': '约翰斯顿环礁',
+  Jordan: '约旦',
+  Kenya: '肯尼亚',
+  Kuwait: '科威特',
+  'Marshall Islands': '马绍尔群岛',
+  Netherlands: '荷兰',
+  'Northern Mariana Islands': '北马里亚纳群岛',
+  Norway: '挪威',
+  Oman: '阿曼',
+  Peru: '秘鲁',
+  Poland: '波兰',
+  'Portugal (incl. Azores)': '葡萄牙（含亚速尔）',
+  'Puerto Rico': '波多黎各',
+  Qatar: '卡塔尔',
+  Romania: '罗马尼亚',
+  'Saudi Arabia': '沙特阿拉伯',
+  Singapore: '新加坡',
+  'South Korea': '韩国',
+  Spain: '西班牙',
+  'The Bahamas': '巴哈马',
+  Turkey: '土耳其',
+  'U.S. Virgin Islands': '美属维尔京群岛',
+  'United Arab Emirates': '阿联酋',
+  'United Kingdom': '英国',
+  'Wake Island': '威克岛',
+};
+
+const GLOBAL_COUNTRY_SHORT_ZH: Record<string, string> = {
+  'Ascension Island (UK)': '阿森松岛',
+  'Cuba (Guantanamo Bay)': '关塔那摩',
+  'Diego Garcia (BIOT)': '迪戈加西亚',
+  'Portugal (incl. Azores)': '葡萄牙',
+  'Saudi Arabia': '沙特',
+  'Northern Mariana Islands': '北马里亚纳',
+  'U.S. Virgin Islands': '美属维尔京',
+};
+
+const GLOBAL_COUNTRY_SHORT_EN: Record<string, string> = {
+  'Ascension Island (UK)': 'Ascension',
+  'Cuba (Guantanamo Bay)': 'Guantanamo',
+  'Diego Garcia (BIOT)': 'Diego Garcia',
+  'Portugal (incl. Azores)': 'Portugal',
+  'United Kingdom': 'UK',
+  'United Arab Emirates': 'UAE',
+  'South Korea': 'S. Korea',
+  'Northern Mariana Islands': 'N. Marianas',
+  'U.S. Virgin Islands': 'USVI',
+};
+
+export function localizeGlobalCountry(name: string, locale: Locale, compact = false): string {
+  if (locale === 'en') {
+    return compact ? (GLOBAL_COUNTRY_SHORT_EN[name] ?? name) : name;
+  }
+  if (compact && GLOBAL_COUNTRY_SHORT_ZH[name]) return GLOBAL_COUNTRY_SHORT_ZH[name];
+  return GLOBAL_COUNTRY_ZH[name] ?? name;
+}
 
 export function localizeSourceUsedFor(id: string, enFallback: string, locale: Locale): string {
   if (locale === 'en') return enFallback;

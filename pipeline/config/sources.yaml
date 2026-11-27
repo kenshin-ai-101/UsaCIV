@@ -204,6 +204,13 @@ sources:
     homepage: "https://oldcc.gov/defense-spending-state-fiscal-year-2024"
     license: "U.S. Government Public Domain"
     used_for: "Defense contract & payroll spending by state (Military advisor)"
+  - id: dod_bsr_overseas
+    category: military
+    title: "DoD Base Structure Report — Overseas & Territory Installations (Geocoded via The US Base Project)"
+    publisher: "U.S. DoD / The US Base Project"
+    homepage: "https://usbaseproject.com/data/"
+    license: "Public Research Compilation of U.S. DoD Public Data"
+    used_for: "Global overseas & territory U.S. military base coordinates, plant replacement value ($M), acreage & service branch (Global Bases Map)"
   - id: fema_declarations
     category: hazards
     title: "OpenFEMA Disaster Declarations Summaries (v2)"

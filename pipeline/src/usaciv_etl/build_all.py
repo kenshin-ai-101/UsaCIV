@@ -1184,7 +1184,9 @@ def run_build():
     write_json("states.json", states_out)
     write_json("layers.json", layers_out)
     write_json("counties.json", {"columns": explorer_columns, "rows": county_rows})
-    print("[build_all] DONE! All 6 V3 reconciled real-data frontend bundles written to web/public/data/")
+    from .spatial.global_military import build_global_military
+    build_global_military(RAW_DIR, WEB_DATA_DIR)
+    print("[build_all] DONE! All 7 reconciled real-data frontend bundles written to web/public/data/")
 
 
 if __name__ == "__main__":

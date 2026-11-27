@@ -31,6 +31,7 @@ export interface MapBubbleSpec {
 export interface AppState {
   theme: ThemeMode;
   locale: Locale;
+  mapView: 'us' | 'global';
   geoScope: 'conus' | 'all';
   mode: MapMode;
   activeLensId: string | null;
@@ -67,6 +68,8 @@ export interface AppState {
   setTheme: (t: ThemeMode) => void;
   setLocale: (l: Locale) => void;
   toggleLocale: () => void;
+  setMapView: (v: 'us' | 'global') => void;
+  toggleMapView: () => void;
   setGeoScope: (scope: 'conus' | 'all') => void;
   toggleTheme: () => void;
   setLens: (id: string | null) => void;
@@ -95,6 +98,7 @@ export interface AppState {
 export const useAppStore = create<AppState>((set) => ({
   theme: 'midnight',
   locale: initialLocale,
+  mapView: 'us',
   geoScope: 'conus',
   mode: 'explore',
   activeLensId: null,
@@ -158,6 +162,18 @@ export const useAppStore = create<AppState>((set) => ({
       }
       return { locale: next };
     }),
+  setMapView: (mapView) =>
+    set({
+      mapView,
+      activeTopMetric: null,
+      yieldReportOpen: false,
+    }),
+  toggleMapView: () =>
+    set((s) => ({
+      mapView: s.mapView === 'us' ? 'global' : 'us',
+      activeTopMetric: null,
+      yieldReportOpen: false,
+    })),
   setGeoScope: (geoScope) => set({ geoScope }),
   toggleTheme: () =>
     set((s) => {
