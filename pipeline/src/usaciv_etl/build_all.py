@@ -67,27 +67,40 @@ DISTRICT_CATALOG = [
     {"id": "bastion", "name": "军事要塞营地", "name_en": "Military Bastion", "color": "#5B6B7C", "naics": ["928110"], "naics_label": "DoD 现役军事基地与防务", "rule": "DoD MIRTA 大型驻军基地驻地或国家安全高集中度"},
 ]
 
-# Exact 19 Data Lenses aligned with reference domains, log/linear scales & individual 6-stop color ramps
+# 27 Data Lenses = 19 original reference-aligned county/hex lenses + 8 high-signal incremental lenses
+# (5 county-level from PEP/BEA/QCEW/ACS + 3 clearly badged state-level macro lenses from OLDCC/DMDC/NOAA)
+# Tuple: (id, name, name_en, group, unit, format, ramp, higher_is, source_id, description, scale, domain, granularity)
 LENS_SPECS = [
-    ("density", "人口密度", "Population Density", "people", "人 / km²", "dec1", "density", "neutral", "acs_5yr", "每平方公里陆地常住人口数（ACS B01003 按面积分配到 25 km 六边形）。对数色阶 [0.34, 390]。", "log", (0.34, 390.0)),
-    ("income", "家庭中位收入", "Median Household Income", "prosperity", "美元 / 年", "usd", "income", "good", "acs_5yr", "六边形所跨县的家庭中位年收入，按人口加权合成（ACS B19013）。", "linear", (41000.0, 110000.0)),
-    ("home", "房价中位数", "Median Home Value", "prosperity", "美元", "usd", "home", "neutral", "acs_5yr", "自有住房中位估值，按人口加权合成（ACS B25077）。对数色阶 [$89K, $690K]。", "log", (89000.0, 690000.0)),
-    ("poverty", "贫困率", "Poverty Rate", "prosperity", "人口占比", "pct", "poverty", "bad", "acs_5yr", "家庭收入低于联邦贫困线的人口占比（ACS B17001）。", "linear", (0.065, 0.30)),
-    ("age", "中位年龄", "Median Age", "people", "岁", "dec1", "age", "neutral", "acs_5yr", "常住人口中位年龄（ACS B01002），呈现老龄化与年轻增长带。", "linear", (31.0, 54.0)),
-    ("foreign_born", "外国出生人口", "Foreign-Born Share", "people", "人口占比", "pct", "foreign_born", "neutral", "acs_5yr", "出生在美国境外的常住人口占比（ACS B05012）。", "linear", (0.007, 0.25)),
-    ("bachelors", "本科及以上学历", "Bachelor's Degree+", "knowledge", "25岁+成人占比", "pct", "bachelors", "good", "acs_5yr", "25 岁及以上人口中拥有本科、硕士、专业或博士学位的比例（ACS B15003）。", "linear", (0.12, 0.51)),
-    ("broadband", "宽带普及率", "Broadband Access", "knowledge", "家庭占比", "pct", "broadband", "good", "acs_5yr", "拥有任意类型宽带互联网订阅的家庭占比（ACS B28002）。", "linear", (0.72, 0.95)),
-    ("commute", "平均单程通勤", "Mean Commute Time", "life", "分钟 / 单程", "min", "commute", "bad", "acs_5yr", "16 岁以上非居家办公劳动者的平均单程通勤时间（ACS B08013 ÷ B08303）。", "linear", (13.0, 33.0)),
-    ("homeownership", "住房自有率", "Homeownership Rate", "life", "自住占比", "pct", "homeownership", "neutral", "acs_5yr", "由房主自住的住房占全部已入住住房的比例（ACS B25003）。", "linear", (0.55, 0.84)),
-    ("uninsured", "无医保比例", "Uninsured Share", "life", "人口占比", "pct", "uninsured", "bad", "acs_5yr", "无任何医疗保险覆盖的平民人口占比（ACS B27010）。", "linear", (0.036, 0.22)),
-    ("forest", "森林覆盖率", "Forest Cover", "land", "陆地占比", "pct", "forest", "neutral", "nlcd", "六边形陆地中落叶林、常绿林与混交林的真实覆被占比（USGS NLCD）。", "linear", (0.0, 0.84)),
-    ("farmland", "农田与牧场", "Farmland & Pasture", "land", "陆地占比", "pct", "farmland", "neutral", "nlcd", "六边形陆地中耕地与牧草地的真实覆被占比（USGS NLCD 81 + 82）。", "linear", (0.0, 0.87)),
-    ("developed", "城镇建设用地", "Built-Up Intensity", "land", "陆地占比", "pct", "developed", "neutral", "nlcd", "六边形陆地中低/中/高密度建成区占比（USGS NLCD 22–24）。", "linear", (0.0, 0.27)),
-    ("faith", "宗教信徒率", "Religious Adherents", "faith", "人 / 百名居民", "dec1", "faith", "neutral", "usrc_2020", "2020 年美国宗教普查各教派信徒总数占当地总人口比例（每百人信徒数，ARDA RCMSCY20）。康州因旧县口径变更留白。", "linear", (0.0, 100.0)),
-    ("faith_tradition", "第一大宗教传统", "Largest Religious Tradition", "faith", "主导宗派", "cat", "cat", "neutral", "usrc_2020", "2020 年各县信徒人数最多的宗教传统（将后期圣徒教会从其他中独立拆分，ARDA RCMSCY20）。", "linear", (1.0, 7.0)),
-    ("amenities", "健康宜居指数", "Wellbeing / Amenities", "life", "指数 (100=全美均值)", "index", "amenities", "good", "cdc_places", "基于 CDC PLACES 2025 四项成人身心健康指标（心理困扰、抑郁、自评欠佳、缺乏运动）反向 Z-score 合成：100 为全美均值，+10 代表优于均值 1 个标准差。无数据州严格留白。", "linear", (85.0, 120.0)),
-    ("disasters", "FEMA 重大灾害", "Major Disasters (2000+)", "hazards", "独立重大灾害次数", "int", "disasters", "bad", "fema_declarations", "2000 年至今各县获批的独立联邦重大灾害（DR，不含生物/疫情）累计声明次数（OpenFEMA v2）。", "linear", (0.0, 18.0)),
-    ("veterans", "退伍军人占比", "Veterans Share", "people", "18岁+平民占比", "pct", "veterans", "neutral", "acs_5yr", "18 岁及以上平民人口中的退伍军人占比（ACS B21001）。", "linear", (0.034, 0.16)),
+    # --- 19 Original Reference-Aligned Lenses (exact ramps, domains & scales preserved untouched) ---
+    ("density", "人口密度", "Population Density", "people", "人 / km²", "dec1", "density", "neutral", "acs_5yr", "每平方公里陆地常住人口数（ACS B01003 按面积分配到 25 km 六边形）。对数色阶 [0.34, 390]。", "log", (0.34, 390.0), "county"),
+    ("income", "家庭中位收入", "Median Household Income", "prosperity", "美元 / 年", "usd", "income", "good", "acs_5yr", "六边形所跨县的家庭中位年收入，按人口加权合成（ACS B19013）。", "linear", (41000.0, 110000.0), "county"),
+    ("home", "房价中位数", "Median Home Value", "prosperity", "美元", "usd", "home", "neutral", "acs_5yr", "自有住房中位估值，按人口加权合成（ACS B25077）。对数色阶 [$89K, $690K]。", "log", (89000.0, 690000.0), "county"),
+    ("poverty", "贫困率", "Poverty Rate", "prosperity", "人口占比", "pct", "poverty", "bad", "acs_5yr", "家庭收入低于联邦贫困线的人口占比（ACS B17001）。", "linear", (0.065, 0.30), "county"),
+    ("age", "中位年龄", "Median Age", "people", "岁", "dec1", "age", "neutral", "acs_5yr", "常住人口中位年龄（ACS B01002），呈现老龄化与年轻增长带。", "linear", (31.0, 54.0), "county"),
+    ("foreign_born", "外国出生人口", "Foreign-Born Share", "people", "人口占比", "pct", "foreign_born", "neutral", "acs_5yr", "出生在美国境外的常住人口占比（ACS B05012）。", "linear", (0.007, 0.25), "county"),
+    ("bachelors", "本科及以上学历", "Bachelor's Degree+", "knowledge", "25岁+成人占比", "pct", "bachelors", "good", "acs_5yr", "25 岁及以上人口中拥有本科、硕士、专业或博士学位的比例（ACS B15003）。", "linear", (0.12, 0.51), "county"),
+    ("broadband", "宽带普及率", "Broadband Access", "knowledge", "家庭占比", "pct", "broadband", "good", "acs_5yr", "拥有任意类型宽带互联网订阅的家庭占比（ACS B28002）。", "linear", (0.72, 0.95), "county"),
+    ("commute", "平均单程通勤", "Mean Commute Time", "life", "分钟 / 单程", "min", "commute", "bad", "acs_5yr", "16 岁以上非居家办公劳动者的平均单程通勤时间（ACS B08013 ÷ B08303）。", "linear", (13.0, 33.0), "county"),
+    ("homeownership", "住房自有率", "Homeownership Rate", "life", "自住占比", "pct", "homeownership", "neutral", "acs_5yr", "由房主自住的住房占全部已入住住房的比例（ACS B25003）。", "linear", (0.55, 0.84), "county"),
+    ("uninsured", "无医保比例", "Uninsured Share", "life", "人口占比", "pct", "uninsured", "bad", "acs_5yr", "无任何医疗保险覆盖的平民人口占比（ACS B27010）。", "linear", (0.036, 0.22), "county"),
+    ("forest", "森林覆盖率", "Forest Cover", "land", "陆地占比", "pct", "forest", "neutral", "nlcd", "六边形陆地中落叶林、常绿林与混交林的真实覆被占比（USGS NLCD）。", "linear", (0.0, 0.84), "county"),
+    ("farmland", "农田与牧场", "Farmland & Pasture", "land", "陆地占比", "pct", "farmland", "neutral", "nlcd", "六边形陆地中耕地与牧草地的真实覆被占比（USGS NLCD 81 + 82）。", "linear", (0.0, 0.87), "county"),
+    ("developed", "城镇建设用地", "Built-Up Intensity", "land", "陆地占比", "pct", "developed", "neutral", "nlcd", "六边形陆地中低/中/高密度建成区占比（USGS NLCD 22–24）。", "linear", (0.0, 0.27), "county"),
+    ("faith", "宗教信徒率", "Religious Adherents", "faith", "人 / 百名居民", "dec1", "faith", "neutral", "usrc_2020", "2020 年美国宗教普查各教派信徒总数占当地总人口比例（每百人信徒数，ARDA RCMSCY20）。康州因旧县口径变更留白。", "linear", (0.0, 100.0), "county"),
+    ("faith_tradition", "第一大宗教传统", "Largest Religious Tradition", "faith", "主导宗派", "cat", "cat", "neutral", "usrc_2020", "2020 年各县信徒人数最多的宗教传统（将后期圣徒教会从其他中独立拆分，ARDA RCMSCY20）。", "linear", (1.0, 7.0), "county"),
+    ("amenities", "健康宜居指数", "Wellbeing / Amenities", "life", "指数 (100=全美均值)", "index", "amenities", "good", "cdc_places", "基于 CDC PLACES 2025 四项成人身心健康指标（心理困扰、抑郁、自评欠佳、缺乏运动）反向 Z-score 合成：100 为全美均值，+10 代表优于均值 1 个标准差。无数据州严格留白。", "linear", (85.0, 120.0), "county"),
+    ("disasters", "FEMA 重大灾害", "Major Disasters (2000+)", "hazards", "独立重大灾害次数", "int", "disasters", "bad", "fema_declarations", "2000 年至今各县获批的独立联邦重大灾害（DR，不含生物/疫情）累计声明次数（OpenFEMA v2）。", "linear", (0.0, 18.0), "county"),
+    ("veterans", "退伍军人占比", "Veterans Share", "people", "18岁+平民占比", "pct", "veterans", "neutral", "acs_5yr", "18 岁及以上平民人口中的退伍军人占比（ACS B21001）。", "linear", (0.034, 0.16), "county"),
+    # --- 5 Incremental County-Level Lenses (PEP / BEA / QCEW / ACS) ---
+    ("pop_growth", "人口增速 (2021–25)", "Population Growth (2021–25)", "people", "2021–25 累计增速", "pct_signed", "pop_growth", "neutral", "pep_population", "2021–2025 年县域常住人口累计变化率（Census PEP），红褐色为收缩、青绿色为阳光带扩张。", "linear", (-0.08, 0.08), "county"),
+    ("gdp_per_cap", "人均真实 GDP", "Real GDP per Capita", "prosperity", "美元 / 人", "usd", "gdp_per_cap", "good", "bea_gdp", "县域真实现价 GDP 除以常住人口（BEA CAGDP2 2024），对数色阶 [$25K, $160K]。", "log", (25000.0, 160000.0), "county"),
+    ("avg_wage", "平均年薪 (QCEW)", "Average Annual Wage", "prosperity", "美元 / 年", "usd", "avg_wage", "good", "bls_qcew", "县域全行业雇主发放的平均年薪（BLS QCEW），刻画单人就业薪酬极核。", "linear", (40000.0, 92000.0), "county"),
+    ("affordability", "房价收入比", "Home Price-to-Income", "prosperity", "中位房价 ÷ 年收入", "ratio", "affordability", "bad", "acs_5yr", "自有住房中位估值与家庭中位年收入之比（ACS B25077 ÷ B19013），越高代表购房压力越大。", "linear", (1.6, 6.8), "county"),
+    ("armed_forces_pct", "现役军人占比", "Active-Duty Share", "defense", "16岁+人口占比", "pct", "armed_forces_pct", "neutral", "acs_5yr", "16 岁及以上常住人口中现役武装部队成员占比（ACS B23025），对数色阶凸显驻军重镇。", "log", (0.0005, 0.04), "county"),
+    # --- 3 Incremental State-Level Macro Lenses (OLDCC / DMDC / NOAA, explicitly badged as State-level) ---
+    ("defense_pct_gdp", "国防支出占 GDP", "Defense Spending % GDP", "defense", "占州 GDP 占比", "pct", "defense_pct_gdp", "neutral", "oldcc_spending", "【州级口径】国防部合同与军职薪资总支出占所在州 GDP 比例（DoD OLDCC FY2024）。", "linear", (0.006, 0.075), "state"),
+    ("mil_active_density", "现役驻军密度", "Active-Duty Personnel", "defense", "现役军人 / 万人", "dec1", "mil_active_density", "neutral", "dmdc_personnel", "【州级口径】每万名常住居民对应的现役驻军人数（DoD DMDC），对数色阶 [3, 180]。", "log", (3.0, 180.0), "state"),
+    ("noaa_billion_cost", "NOAA 巨灾损失", "Billion-Dollar Disasters", "hazards", "十亿美元 (1980–2024)", "usd_b", "noaa_billion_cost", "bad", "noaa_billions", "【州级口径】1980–2024 年通胀调整后的十亿美元级气象气候巨灾累计损失（NOAA NCEI），对数色阶 [$3B, $260B]。", "log", (3.0, 260.0), "state"),
 ]
 
 LAND_KEYS = ["forest", "crop", "pasture", "grass", "shrub", "wetland", "developed"]
@@ -298,6 +311,47 @@ def run_build():
             hex_lenses["faith"][hid] = round(f_num / f_den, 1)
         if any_trad:
             hex_lenses["faith_tradition"][hid] = max(trad_sums.items(), key=lambda kv: kv[1])[0]
+
+        # 5 Incremental County-Level Lenses (PEP Growth, BEA GDP/Cap, BLS QCEW Wage, Affordability, Active-Duty Share)
+        pg_num, pg_den = 0.0, 0.0
+        gpc_num, gpc_den = 0.0, 0.0
+        wg_num, wg_den = 0.0, 0.0
+        af_num, af_den = 0.0, 0.0
+        mil_num, mil_den = 0.0, 0.0
+        for fips, w, _ in w_parts:
+            pgv = county_pep.get(fips, {}).get("pop_growth_pct")
+            if pgv is not None:
+                pg_num += pgv * w
+                pg_den += w
+            cpop_full = acs5.get(fips, {}).get("pop") or 0.0
+            cgdp_full = county_gdp.get(fips)
+            if cgdp_full is not None and cgdp_full > 0 and cpop_full > 0:
+                gpc_num += ((cgdp_full * 1e6) / cpop_full) * w
+                gpc_den += w
+            wgv = qcew_totals.get(fips, {}).get("avg_wage")
+            if wgv is not None and wgv > 0:
+                wg_num += wgv * w
+                wg_den += w
+            a_rec = acs5.get(fips, {})
+            inc_c = a_rec.get("income")
+            hom_c = a_rec.get("home")
+            if inc_c and hom_c and inc_c > 0:
+                af_num += (hom_c / inc_c) * w
+                af_den += w
+            milv = a_rec.get("armed_forces_pct")
+            if milv is not None:
+                mil_num += milv * w
+                mil_den += w
+        if pg_den > 0:
+            hex_lenses["pop_growth"][hid] = round(pg_num / pg_den, 4)
+        if gpc_den > 0:
+            hex_lenses["gdp_per_cap"][hid] = round(gpc_num / gpc_den)
+        if wg_den > 0:
+            hex_lenses["avg_wage"][hid] = round(wg_num / wg_den)
+        if af_den > 0:
+            hex_lenses["affordability"][hid] = round(af_num / af_den, 2)
+        if mil_den > 0:
+            hex_lenses["armed_forces_pct"][hid] = round(mil_num / mil_den, 4)
 
     # 5. Load all spatial point/hub/energy/mining/military/wonder/trade layers
     proj = UnifiedProjector(grid_meta)
@@ -842,6 +896,23 @@ def run_build():
             "top_cities": [c["id"] for c in cities_by_state.get(abbr, [])[:8]],
         })
 
+    # Populate 3 State-Level Macro Lenses (OLDCC Defense % GDP, DMDC Active Troops per 10K, NOAA Billion-Dollar Disasters)
+    st_out_by_fips = {s["fips"]: s for s in states_out}
+    for hid, sf in enumerate(st_arr):
+        so = st_out_by_fips.get(sf)
+        if not so:
+            continue
+        dp = so.get("defense_pct_gdp")
+        if dp is not None:
+            hex_lenses["defense_pct_gdp"][hid] = round(float(dp), 4)
+        ma = so.get("military_active")
+        spop = so.get("pop") or 0
+        if ma is not None and spop > 0:
+            hex_lenses["mil_active_density"][hid] = round((float(ma) / float(spop)) * 10000.0, 1)
+        nc = so.get("noaa_billion_cost_busd")
+        if nc is not None:
+            hex_lenses["noaa_billion_cost"][hid] = round(float(nc), 1)
+
     # 9. Assemble 3,144-County Explorer Table
     explorer_columns = [
         {"key": "pop", "label": "总人口", "unit": "人", "format": "int", "group": "人口", "source_id": "acs_5yr", "numeric": True},
@@ -960,14 +1031,14 @@ def run_build():
         })
     county_rows.sort(key=lambda r: r["pop"], reverse=True)
 
-    # 10. Compute Lens metadata with exact reference domains & log/linear scales for all 19 lenses
+    # 10. Compute Lens metadata with exact domains, log/linear scales & granularity for all 27 lenses
     lenses_meta = []
-    for (lid, name, name_en, grp, unit, fmt, ramp, hi, src_id, desc, scale, dom) in LENS_SPECS:
+    for (lid, name, name_en, grp, unit, fmt, ramp, hi, src_id, desc, scale, dom, gran) in LENS_SPECS:
         vals = [v for v in hex_lenses[lid] if v is not None]
         if lid == "faith_tradition":
             lenses_meta.append({
                 "id": lid, "name": name, "name_en": name_en, "group": grp, "unit": unit,
-                "format": fmt, "ramp": ramp, "scale": scale, "domain": [1, 7],
+                "format": fmt, "ramp": ramp, "scale": scale, "domain": [1, 7], "granularity": gran,
                 "higher_is": hi, "source_id": src_id, "description": desc,
                 "p02": 1, "p98": 7, "min": 1, "max": 7, "median": 1,
                 "categorical": True,
@@ -979,7 +1050,7 @@ def run_build():
             d0, d1 = float(dom[0]), float(dom[1])
             lenses_meta.append({
                 "id": lid, "name": name, "name_en": name_en, "group": grp, "unit": unit,
-                "format": fmt, "ramp": ramp, "scale": scale, "domain": [d0, d1],
+                "format": fmt, "ramp": ramp, "scale": scale, "domain": [d0, d1], "granularity": gran,
                 "higher_is": hi, "source_id": src_id, "description": desc,
                 "p02": round(d0, 4),
                 "p98": round(d1, 4),

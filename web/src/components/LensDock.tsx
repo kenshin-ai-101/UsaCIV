@@ -110,7 +110,7 @@ export const LensDock: React.FC<LensDockProps> = ({ lenses, world }) => {
     return fracs.map((f, idx) => {
       const val = lensValueAt(activeLens, f);
       const txt = formatMetric(val, activeLens.format, locale);
-      if (idx === 0) return d0 > 0 ? `≤${txt}` : txt;
+      if (idx === 0) return Math.abs(d0) > 1e-9 ? `≤${txt}` : txt;
       if (idx === fracs.length - 1) return `≥${txt}`;
       return txt;
     });
@@ -142,20 +142,27 @@ export const LensDock: React.FC<LensDockProps> = ({ lenses, world }) => {
         </div>
       )}
 
-      {/* Full 19-Lens Grouped Picker Drawer */}
+      {/* Full 27-Lens Grouped Picker Drawer (19 reference + 5 county + 3 state-level macro) */}
       {pickerOpen && (
-        <div className="atlas-panel-brass pointer-events-auto w-[min(660px,calc(100vw-24px))] max-h-[62vh] overflow-y-auto rounded-xl p-3.5">
+        <div className="atlas-panel-brass pointer-events-auto w-[min(880px,calc(100vw-24px))] max-h-[68vh] overflow-y-auto rounded-xl p-3.5">
           <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-[var(--border-hairline)]">
             <div>
-              <h3 className="font-display text-sm font-bold m-0" style={{ color: 'var(--brass-bright)' }}>{L('全部 19 种真实数据视角', 'All 19 Data Lenses')}</h3>
-              <p className="text-[11px] opacity-65 m-0">{L('按快捷键 L / Shift+L 循环切换；悬停或拖拽图例直方图即可切片过滤地图', 'Press L / Shift+L to cycle lenses; hover or drag across the legend histogram to slice the map')}</p>
+              <h3 className="font-display text-sm font-bold m-0" style={{ color: 'var(--brass-bright)' }}>
+                {L(`全部 ${lenses.length} 种真实数据视角`, `All ${lenses.length} Data Lenses`)}
+              </h3>
+              <p className="text-[11px] opacity-65 m-0">
+                {L(
+                  '19 原版县级视角 + 5 县级增量视角 + 3 州级宏观视角；按 L / Shift+L 循环切换，悬停或拖拽直方图即可切片',
+                  '19 reference county lenses + 5 county & 3 state-level macro lenses; press L / Shift+L to cycle or drag histogram to slice',
+                )}
+              </p>
             </div>
             <button onClick={() => setPickerOpen(false)} className="p-1 rounded-lg hover:bg-[var(--surface-paper-hover)] cursor-pointer">
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {LENS_GROUPS.map((grp) => {
               const items = lenses.filter((l) => l.group === grp.id);
               if (!items.length) return null;
@@ -165,6 +172,7 @@ export const LensDock: React.FC<LensDockProps> = ({ lenses, world }) => {
                   {items.map((l) => {
                     const active = l.id === activeLensId;
                     const stops = COLOR_RAMPS[l.ramp];
+                    const isState = l.granularity === 'state';
                     return (
                       <button
                         key={l.id}
@@ -172,14 +180,29 @@ export const LensDock: React.FC<LensDockProps> = ({ lenses, world }) => {
                           setLens(l.id);
                           setPickerOpen(false);
                         }}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition flex items-center justify-between gap-2 cursor-pointer border ${
+                        className={`w-full text-left px-2 py-1.5 rounded-lg text-xs transition flex items-center justify-between gap-1.5 cursor-pointer border ${
                           active ? 'border-[var(--brass)] bg-[var(--brass-soft)] font-bold' : 'border-transparent hover:bg-[var(--surface-paper-hover)]'
                         }`}
                       >
-                        <span className="truncate">{localizeLensName(l, locale)}</span>
+                        <span className="flex items-center gap-1 min-w-0">
+                          <span className="truncate">{localizeLensName(l, locale)}</span>
+                          {isState && (
+                            <span
+                              className="text-[8.5px] leading-none px-1 py-[2px] rounded border shrink-0 font-semibold"
+                              style={{
+                                borderColor: 'rgba(218, 179, 98, 0.48)',
+                                color: 'var(--brass-bright)',
+                                background: 'rgba(218, 179, 98, 0.12)',
+                              }}
+                              title={L('该指标源自州级官方统计，同州六边形共享同一数值', 'State-level official statistic: all hexes in a state share the state value')}
+                            >
+                              {L('州级', 'STATE')}
+                            </span>
+                          )}
+                        </span>
                         {stops ? (
                           <span
-                            className="w-11 h-2 rounded-sm shrink-0 border border-black/30"
+                            className="w-8 h-2 rounded-sm shrink-0 border border-black/30"
                             style={{ background: `linear-gradient(90deg, ${stops.join(', ')})` }}
                           />
                         ) : (
@@ -204,8 +227,20 @@ export const LensDock: React.FC<LensDockProps> = ({ lenses, world }) => {
         <div className="atlas-panel-brass pointer-events-auto rounded-xl p-2.5 w-[min(316px,calc(100vw-24px))]">
           <div className="flex items-start justify-between gap-2 mb-1">
             <div>
-              <div className="font-display text-sm font-bold flex items-center gap-1.5" style={{ color: 'var(--brass-bright)' }}>
-                {localizeLensName(activeLens, locale)}
+              <div className="font-display text-sm font-bold flex items-center flex-wrap gap-1.5" style={{ color: 'var(--brass-bright)' }}>
+                <span>{localizeLensName(activeLens, locale)}</span>
+                {activeLens.granularity === 'state' && (
+                  <span
+                    className="text-[9px] font-sans font-semibold px-1.5 py-[1px] rounded border leading-tight"
+                    style={{
+                      borderColor: 'rgba(218, 179, 98, 0.5)',
+                      background: 'rgba(218, 179, 98, 0.14)',
+                      color: 'var(--brass-bright)',
+                    }}
+                  >
+                    {L('州级口径', 'State-level')}
+                  </span>
+                )}
                 {!isEn && <span className="text-[10.5px] font-normal opacity-65 font-sans">({activeLens.name_en})</span>}
               </div>
               <p className="text-[10.5px] opacity-75 m-0 mt-0.5 line-clamp-2 leading-snug">{localizeLensDesc(activeLens, locale)}</p>
@@ -399,7 +434,7 @@ export const LensDock: React.FC<LensDockProps> = ({ lenses, world }) => {
           className={`dock-btn ${pickerOpen || (activeLensId && !['density', 'income', 'bachelors'].includes(activeLensId)) ? 'active' : ''}`}
         >
           <Layers className="w-3.5 h-3.5" />
-          <span>{L('19 视角', '19 Lenses')}</span>
+          <span>{L(`${lenses.length} 视角`, `${lenses.length} Lenses`)}</span>
           <ChevronUp className={`w-3.5 h-3.5 transition-transform ${pickerOpen ? 'rotate-180' : ''}`} />
         </button>
       </div>

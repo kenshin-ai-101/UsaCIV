@@ -2,11 +2,12 @@ import type { LensMeta, Locale, ThemeMode } from '../../types/world';
 
 export const LENS_GROUPS: { id: LensMeta['group']; label: string; labelEn: string }[] = [
   { id: 'people', label: '人口结构', labelEn: 'People' },
-  { id: 'prosperity', label: '繁荣与住房', labelEn: 'Prosperity & Housing' },
+  { id: 'prosperity', label: '经济与住房', labelEn: 'Economy & Housing' },
   { id: 'knowledge', label: '科技与知识', labelEn: 'Knowledge' },
   { id: 'life', label: '日常生活', labelEn: 'Daily Life' },
-  { id: 'faith', label: '宗教信仰', labelEn: 'Faith' },
+  { id: 'defense', label: '国防与军工', labelEn: 'Defense & Military' },
   { id: 'hazards', label: '灾害风险', labelEn: 'Hazards' },
+  { id: 'faith', label: '宗教信仰', labelEn: 'Faith' },
   { id: 'land', label: '地表覆被', labelEn: 'Land Cover' },
 ];
 
@@ -33,7 +34,16 @@ export const COLOR_RAMPS: Record<string, string[]> = {
   faith:         ['#1a1033', '#3d2466', '#6b3d8f', '#a5649c', '#d99a8f', '#f7dca0'],
   amenities:     ['#3b0a1e', '#7a1f3d', '#b9534f', '#e3a35c', '#c9d97a', '#7ecf8e'],
   disasters:     ['#14161f', '#2e2a4a', '#5b3466', '#93405f', '#cf6a4a', '#f4b860'],
-  veterans:      ['#0d1a12', '#1f3d2a', '#3b6340', '#6b8a4e', '#a9b46a', '#ece2a6'],
+  veterans:           ['#0d1a12', '#1f3d2a', '#3b6340', '#6b8a4e', '#a9b46a', '#ece2a6'],
+  // 8 Incremental Lenses (5 county-level + 3 state-level macro)
+  pop_growth:         ['#6b102c', '#b93148', '#e37e6c', '#e6e2cf', '#6fc7a5', '#1d8f86', '#0b4f6c'],
+  gdp_per_cap:        ['#1c1108', '#542d12', '#9e5318', '#d98a24', '#f4c852', '#fff8cc'],
+  avg_wage:           ['#0e1b2e', '#1b4363', '#237487', '#3ea68e', '#9dd680', '#f4f7c5'],
+  affordability:      ['#113838', '#276b62', '#7ca362', '#d8b44c', '#df6d3b', '#a81c2e'],
+  armed_forces_pct:   ['#0e1522', '#20324f', '#385b82', '#648db3', '#b8b778', '#f5da74'],
+  defense_pct_gdp:    ['#141921', '#2b3648', '#4d5d6e', '#82876b', '#c6a452', '#f8dc7c'],
+  mil_active_density: ['#0d181a', '#1b3a3e', '#2f6563', '#569478', '#a3c474', '#f0eba0'],
+  noaa_billion_cost:  ['#141222', '#3c1e42', '#7d2948', '#c44b3b', '#ec8a3d', '#fce08a'],
   // Legacy aliases for backwards safety
   wealth:        ['#3a1c0b', '#7a4413', '#b8781f', '#e3b23c', '#f6e27f', '#fffbe0'],
   knowledge:     ['#08203e', '#0f4c81', '#2a7fc1', '#5fa8e0', '#a6d1f2', '#eaf5ff'],
@@ -284,15 +294,22 @@ export function formatMetric(val: number | null | undefined, fmt: string, locale
       if (Math.abs(val) >= 100_000) return '$' + Math.round(val / 1000) + 'K';
       return '$' + Math.round(val).toLocaleString('en-US');
     case 'ratio':
-      return '×' + val.toFixed(1);
+      return val.toFixed(1) + '×';
     case 'usd_k':
       return '$' + (val / 1000).toFixed(val >= 100_000 ? 0 : 1) + 'K';
+    case 'usd_b':
+      return '$' + (val >= 100 ? Math.round(val).toLocaleString('en-US') : val.toFixed(1)) + 'B';
     case 'usd_m':
       if (val >= 1_000_000) return '$' + (val / 1_000_000).toFixed(2) + 'T';
       if (val >= 1_000) return '$' + (val / 1_000).toFixed(1) + 'B';
       return '$' + Math.round(val).toLocaleString('en-US') + 'M';
     case 'pct':
       return (val * 100).toFixed(1) + '%';
+    case 'pct_signed': {
+      const p = val * 100;
+      if (Math.abs(p) < 0.05) return '0.0%';
+      return (p > 0 ? '+' : '') + p.toFixed(1) + '%';
+    }
     case 'min':
       return val.toFixed(1) + (locale === 'en' ? ' min' : ' 分钟');
     case 'dec1':

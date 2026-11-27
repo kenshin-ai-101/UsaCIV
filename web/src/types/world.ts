@@ -46,12 +46,13 @@ export interface LensMeta {
   id: string;
   name: string;
   name_en: string;
-  group: 'people' | 'prosperity' | 'knowledge' | 'life' | 'faith' | 'hazards' | 'land';
+  group: 'people' | 'prosperity' | 'knowledge' | 'life' | 'defense' | 'faith' | 'hazards' | 'land';
   unit: string;
-  format: 'int' | 'pct' | 'usd' | 'usd_k' | 'dec1' | 'min' | 'index' | 'cat';
+  format: 'int' | 'pct' | 'pct_signed' | 'ratio' | 'usd' | 'usd_k' | 'usd_b' | 'dec1' | 'min' | 'index' | 'cat';
   ramp: string;
   scale?: 'linear' | 'log';
   domain?: [number, number];
+  granularity?: 'county' | 'state';
   higher_is: 'good' | 'bad' | 'neutral';
   source_id: string;
   description: string;

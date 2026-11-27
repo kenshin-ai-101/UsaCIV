@@ -49,6 +49,13 @@ const LENS_UNIT_EN: Record<string, string> = {
   '人 / 百名居民': 'per 100 residents',
   '主导宗派': 'Largest tradition',
   '陆地占比': '% of land area',
+  '2021–25 累计增速': '2021–25 % change',
+  '美元 / 人': 'USD / resident',
+  '中位房价 ÷ 年收入': 'Home value ÷ income',
+  '16岁+人口占比': '% of residents 16+',
+  '占州 GDP 占比': '% of state GDP',
+  '现役军人 / 万人': 'active troops / 10k',
+  '十亿美元 (1980–2024)': '$B cumulative (1980–2024)',
 };
 
 const LENS_DESC_EN: Record<string, string> = {
@@ -71,6 +78,14 @@ const LENS_DESC_EN: Record<string, string> = {
   forest: 'Share of hex land covered by deciduous, evergreen, and mixed forest (USGS NLCD).',
   farmland: 'Share of hex land covered by cultivated crops and pasture/hay (USGS NLCD 81 + 82).',
   developed: 'Share of hex land in low-, medium-, and high-intensity developed urban cover (USGS NLCD 22–24).',
+  pop_growth: 'Cumulative 2021–2025 county population change (Census PEP): burgundy marks decline, teal marks Sun Belt expansion.',
+  gdp_per_cap: 'Real current-dollar county GDP per resident (BEA CAGDP2 2024), log scale [$25K, $160K].',
+  avg_wage: 'Employer-paid average annual wage across all covered industries (BLS QCEW).',
+  affordability: 'Ratio of median owner-occupied home value to median annual household income (ACS B25077 ÷ B19013). Higher means greater housing stress.',
+  armed_forces_pct: 'Share of residents age 16+ serving in active-duty U.S. Armed Forces (ACS B23025), log scale highlighting garrison communities.',
+  defense_pct_gdp: '[State-level] Total DoD contract and payroll spending as a share of state GDP (DoD OLDCC FY2024).',
+  mil_active_density: '[State-level] Active-duty U.S. military personnel per 10,000 state residents (DoD DMDC), log scale [3, 180].',
+  noaa_billion_cost: '[State-level] CPI-adjusted cumulative losses from billion-dollar weather & climate disasters, 1980–2024 (NOAA NCEI), log scale [$3B, $260B].',
 };
 
 const RELIGION_EN: Record<string, string> = {
