@@ -96,6 +96,11 @@ export default function App() {
     sy: 0,
     moved: false,
   });
+  const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinchRef = useRef<{ dist: number; midX: number; midY: number } | null>(null);
+  const wasPinchRef = useRef(false);
+  const lastTapRef = useRef<{ t: number; x: number; y: number }>({ t: 0, x: 0, y: 0 });
+  const pendingTapRef = useRef<number | null>(null);
   const rafDirtyRef = useRef(true);
   const initialHashRef = useRef(window.location.hash);
   const hashHydratedRef = useRef(false);
@@ -377,41 +382,162 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((document.activeElement as HTMLElement)?.tagName === 'INPUT' || (document.activeElement as HTMLElement)?.tagName === 'SELECT') {
-        if (e.key === 'Escape') (document.activeElement as HTMLElement).blur();
-        return;
+    const PAN_SPEED = 750; // px per second (matches reference)
+    const PAN_KEYS: Record<string, [number, number]> = {
+      ArrowLeft: [-1, 0],
+      a: [-1, 0],
+      ArrowRight: [1, 0],
+      d: [1, 0],
+      ArrowUp: [0, -1],
+      w: [0, -1],
+      ArrowDown: [0, 1],
+      s: [0, 1],
+    };
+    const held = new Set<string>();
+
+    const updatePan = () => {
+      let x = 0;
+      let y = 0;
+      for (const k of held) {
+        x += PAN_KEYS[k][0];
+        y += PAN_KEYS[k][1];
       }
-      if (e.key === 'Escape') {
-        const hadTopMetric = useAppStore.getState().activeTopMetric !== null;
-        setAlmanacOpen(false);
-        setHelpOpen(false);
-        setYieldReportOpen(false);
-        setActiveTopMetric(null);
-        if (!hadTopMetric && useAppStore.getState().mode !== 'explore') {
+      cameraRef.current.setPanVelocity(Math.sign(x) * PAN_SPEED, Math.sign(y) * PAN_SPEED);
+      if (x || y) requestDraw();
+    };
+
+    const isTyping = (t: EventTarget | null) => {
+      const el = t as HTMLElement | null;
+      return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+    };
+
+    const ownsArrows = (t: EventTarget | null) => {
+      const el = t as HTMLElement | null;
+      return !!el && el !== document.body && (el.getAttribute?.('role') === 'slider' || !!el.closest?.('[role="dialog"], [role="listbox"], [role="menu"]'));
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
+      const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      const st = useAppStore.getState();
+
+      if (k === 'Escape') {
+        if (isTyping(e.target)) {
+          (e.target as HTMLElement).blur();
+          return;
+        }
+        // Strict layered peel matching reference: help -> top metric / yield report -> Almanac -> panel
+        if (st.helpOpen) { setHelpOpen(false); return; }
+        if (st.activeTopMetric !== null) { setActiveTopMetric(null); return; }
+        if (st.yieldReportOpen) { setYieldReportOpen(false); return; }
+        if (st.almanacOpen) { setAlmanacOpen(false); return; }
+        if (st.mode !== 'explore') {
           closeSidePanel();
           if (meta) cameraRef.current.fitBounds(meta.bounds_km, { padTop: 56, padBottom: 74, animate: true });
           requestDraw();
         }
-      } else if (e.key.toLowerCase() === 'r') {
-        toggleLayer('resources');
-      } else if (e.key.toLowerCase() === 't') {
-        toggleTheme();
-      } else if (e.key.toLowerCase() === 'l' && meta) {
+        return;
+      }
+
+      if (e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target)) return;
+
+      if (e.key === '?') {
+        e.preventDefault();
+        setHelpOpen(!st.helpOpen);
+        return;
+      }
+
+      // Block map shortcuts while Help or Almanac modal is open
+      if (st.helpOpen || st.almanacOpen) return;
+
+      if (PAN_KEYS[k] && !(k.startsWith('Arrow') && ownsArrows(e.target))) {
+        e.preventDefault();
+        held.add(k);
+        updatePan();
+      } else if (k === '+' || k === '=') {
+        e.preventDefault();
+        const cam = cameraRef.current;
+        cam.zoomByAnimated(cam.width * 0.5, cam.height * 0.5, 1.5, 220);
+        requestDraw();
+      } else if (k === '-' || k === '_') {
+        e.preventDefault();
+        const cam = cameraRef.current;
+        cam.zoomByAnimated(cam.width * 0.5, cam.height * 0.5, 1 / 1.5, 220);
+        requestDraw();
+      } else if (k === 'l' && meta) {
         const ids: (string | null)[] = [null, ...meta.lenses.map((l) => l.id)];
-        const curIdx = ids.indexOf(useAppStore.getState().activeLensId);
-        setLens(ids[(curIdx + 1) % ids.length]);
-      } else if (e.key === '?') {
-        setAlmanacOpen(true, 'sources');
+        const curIdx = ids.indexOf(st.activeLensId);
+        const step = e.shiftKey ? -1 : 1;
+        setLens(ids[(curIdx + step + ids.length) % ids.length]);
+      } else if (k === 'r') {
+        toggleLayer('resources');
+      } else if (k === 't') {
+        toggleTheme();
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      if (held.delete(k)) updatePan();
+    };
+
+    const onBlur = () => {
+      if (held.size > 0) {
+        held.clear();
+        updatePan();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+      cameraRef.current.setPanVelocity(0, 0);
+    };
   }, [meta, closeSidePanel, toggleLayer, toggleTheme, setLens, setAlmanacOpen, setHelpOpen, setYieldReportOpen, setActiveTopMetric, requestDraw]);
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
-    dragRef.current = { active: true, sx: e.clientX, sy: e.clientY, moved: false };
+    const rect = e.currentTarget.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    pointersRef.current.set(e.pointerId, { x: sx, y: sy });
+
+    if (pointersRef.current.size === 2) {
+      if (pendingTapRef.current !== null) {
+        window.clearTimeout(pendingTapRef.current);
+        pendingTapRef.current = null;
+      }
+      dragRef.current.active = false;
+      wasPinchRef.current = true;
+      const pts = Array.from(pointersRef.current.values());
+      const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+      pinchRef.current = {
+        dist: Math.max(1, dist),
+        midX: (pts[0].x + pts[1].x) * 0.5,
+        midY: (pts[0].y + pts[1].y) * 0.5,
+      };
+      setHoverInfo((h) => (h.picked ? { ...h, picked: null } : h));
+      return;
+    }
+
+    if (pointersRef.current.size === 1) {
+      wasPinchRef.current = false;
+      const now = performance.now();
+      const prev = lastTapRef.current;
+      if (
+        pendingTapRef.current !== null &&
+        now - prev.t <= 320 &&
+        Math.hypot(sx - prev.x, sy - prev.y) <= 22
+      ) {
+        window.clearTimeout(pendingTapRef.current);
+        pendingTapRef.current = null;
+      }
+      dragRef.current = { active: true, sx: e.clientX, sy: e.clientY, moved: false };
+    }
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -419,7 +545,30 @@ export default function App() {
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
 
-    if (dragRef.current.active) {
+    if (pointersRef.current.has(e.pointerId)) {
+      pointersRef.current.set(e.pointerId, { x: sx, y: sy });
+    }
+
+    // Two-finger touch pinch-to-zoom & drag-to-pan
+    if (pointersRef.current.size >= 2 && pinchRef.current) {
+      const pts = Array.from(pointersRef.current.values());
+      const dist = Math.max(1, Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y));
+      const midX = (pts[0].x + pts[1].x) * 0.5;
+      const midY = (pts[0].y + pts[1].y) * 0.5;
+      const dx = midX - pinchRef.current.midX;
+      const dy = midY - pinchRef.current.midY;
+      cameraRef.current.panByScreen(dx, dy);
+      const ratio = dist / pinchRef.current.dist;
+      if (Math.abs(ratio - 1) > 0.002) {
+        cameraRef.current.zoomAtScreen(midX, midY, ratio);
+      }
+      pinchRef.current = { dist, midX, midY };
+      setHoverInfo((h) => (h.picked ? { ...h, picked: null } : h));
+      requestDraw();
+      return;
+    }
+
+    if (dragRef.current.active && !wasPinchRef.current) {
       const dx = e.clientX - dragRef.current.sx;
       const dy = e.clientY - dragRef.current.sy;
       if (Math.hypot(dx, dy) > 3) dragRef.current.moved = true;
@@ -464,6 +613,15 @@ export default function App() {
   };
 
   const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    pointersRef.current.delete(e.pointerId);
+    if (pointersRef.current.size < 2) pinchRef.current = null;
+
+    if (wasPinchRef.current) {
+      if (pointersRef.current.size === 0) wasPinchRef.current = false;
+      dragRef.current.active = false;
+      return;
+    }
+
     const wasMoved = dragRef.current.moved;
     dragRef.current.active = false;
     if (wasMoved || !world) return;
@@ -471,6 +629,23 @@ export default function App() {
     const rect = e.currentTarget.getBoundingClientRect();
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
+
+    // Double-click / double-tap zooms in smoothly on that spot (matches reference)
+    const now = performance.now();
+    const DOUBLE_MS = 320;
+    const prev = lastTapRef.current;
+    if (now - prev.t <= DOUBLE_MS && Math.hypot(sx - prev.x, sy - prev.y) <= 22) {
+      if (pendingTapRef.current !== null) {
+        window.clearTimeout(pendingTapRef.current);
+        pendingTapRef.current = null;
+      }
+      lastTapRef.current = { t: 0, x: 0, y: 0 };
+      cameraRef.current.zoomByAnimated(sx, sy, 2.0, 260);
+      requestDraw();
+      return;
+    }
+
+    lastTapRef.current = { t: now, x: sx, y: sy };
     const [wx, wy] = cameraRef.current.screenToWorld(sx, sy);
     const picked = hitTestScreen(
       sx, sy, wx, wy,
@@ -480,24 +655,35 @@ export default function App() {
     );
     if (!picked) return;
 
-    if (picked.kind === 'city') openCity(picked.city.id);
-    else if (picked.kind === 'wonder') flyTo(picked.wonder.x, picked.wonder.y, 1.5);
-    else if (picked.kind === 'power') flyTo(picked.plant.x, picked.plant.y, 1.4);
-    else if (picked.kind === 'airport') flyTo(picked.airport.x, picked.airport.y, 1.4);
-    else if (picked.kind === 'port') flyTo(picked.port.x, picked.port.y, 1.4);
-    else if (picked.kind === 'military') flyTo(picked.base.x, picked.base.y, 1.4);
-    else if (picked.kind === 'hex') {
-      const hid = picked.hexId;
-      if (mode === 'explorer') {
-        const fips = world.fips[hid];
-        const co = countyByFips.get(fips);
-        if (co) setBrushed(new Set(co.hex_ids), new Set([fips]));
-        return;
+    if (pendingTapRef.current !== null) window.clearTimeout(pendingTapRef.current);
+    pendingTapRef.current = window.setTimeout(() => {
+      pendingTapRef.current = null;
+      if (picked.kind === 'city') openCity(picked.city.id);
+      else if (picked.kind === 'wonder') flyTo(picked.wonder.x, picked.wonder.y, 1.5);
+      else if (picked.kind === 'power') flyTo(picked.plant.x, picked.plant.y, 1.4);
+      else if (picked.kind === 'airport') flyTo(picked.airport.x, picked.airport.y, 1.4);
+      else if (picked.kind === 'port') flyTo(picked.port.x, picked.port.y, 1.4);
+      else if (picked.kind === 'military') flyTo(picked.base.x, picked.base.y, 1.4);
+      else if (picked.kind === 'hex') {
+        const hid = picked.hexId;
+        if (useAppStore.getState().mode === 'explorer') {
+          const fips = world.fips[hid];
+          const co = countyByFips.get(fips);
+          if (co) setBrushed(new Set(co.hex_ids), new Set([fips]));
+          return;
+        }
+        const cbsa = world.cbsa[hid];
+        if (cbsa && cities.some((c) => c.id === cbsa)) openCity(cbsa);
+        else openState(world.st[hid]);
       }
-      const cbsa = world.cbsa[hid];
-      if (cbsa && cities.some((c) => c.id === cbsa)) openCity(cbsa);
-      else openState(world.st[hid]);
-    }
+    }, DOUBLE_MS);
+  };
+
+  const onPointerCancel = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    pointersRef.current.delete(e.pointerId);
+    if (pointersRef.current.size < 2) pinchRef.current = null;
+    if (pointersRef.current.size === 0) wasPinchRef.current = false;
+    dragRef.current.active = false;
   };
 
   const onWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
@@ -561,7 +747,10 @@ export default function App() {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onDoubleClick={(e) => e.preventDefault()}
         onPointerLeave={() => {
+          if (pointersRef.current.size > 0) return;
           dragRef.current.active = false;
           setHoverInfo((h) => ({ ...h, picked: null }));
           setHoveredHex(-1);
@@ -591,7 +780,14 @@ export default function App() {
         activeLens={activeLens}
         cameraRef={cameraRef}
         camTick={camTick}
-        onJump={(wx, wy) => flyTo(wx, wy, Math.max(0.55, cameraRef.current.scale))}
+        onJump={(wx, wy, immediate) => {
+          if (immediate) {
+            cameraRef.current.jumpToWorld(wx, wy);
+            requestDraw();
+          } else {
+            flyTo(wx, wy, Math.max(0.55, cameraRef.current.scale));
+          }
+        }}
       />
 
       <MapTooltip

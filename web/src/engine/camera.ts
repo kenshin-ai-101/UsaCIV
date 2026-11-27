@@ -10,6 +10,11 @@ export class MapCamera {
   width = 1280;
   height = 800;
 
+  /** Continuous keyboard pan velocity in screen px/sec (+x = east, +y = south) */
+  panVelX = 0;
+  panVelY = 0;
+
+  private lastStepMs: number | null = null;
   private bounds: [number, number, number, number] = [-2500, 50, 2350, 3250];
   private anim: {
     t0: number;
@@ -79,18 +84,63 @@ export class MapCamera {
     };
   }
 
-  step(now: number): boolean {
-    if (!this.anim) return false;
-    const t = Math.min(1, (now - this.anim.t0) / this.anim.dur);
-    // Smooth cubic ease-out
-    const e = 1 - Math.pow(1 - t, 3);
-    this.cx = this.anim.x0 + (this.anim.x1 - this.anim.x0) * e;
-    this.cy = this.anim.y0 + (this.anim.y1 - this.anim.y0) * e;
-    // Log-space zoom interpolation feels completely natural
-    this.scale = Math.exp(Math.log(this.anim.s0) + (Math.log(this.anim.s1) - Math.log(this.anim.s0)) * e);
-    if (t >= 1) this.anim = null;
+  setPanVelocity(vxPxPerSec: number, vyPxPerSec: number) {
+    this.panVelX = vxPxPerSec;
+    this.panVelY = vyPxPerSec;
+    if (vxPxPerSec !== 0 || vyPxPerSec !== 0) {
+      this.anim = null;
+    } else {
+      this.lastStepMs = null;
+    }
+  }
+
+  /** Smoothly zoom by `factor` anchored around screen pixel `(sx, sy)` (compounds cleanly on rapid presses). */
+  zoomByAnimated(sx: number, sy: number, factor: number, dur = 220) {
+    const baseCx = this.anim ? this.anim.x1 : this.cx;
+    const baseCy = this.anim ? this.anim.y1 : this.cy;
+    const baseScale = this.anim ? this.anim.s1 : this.scale;
+    const wx = (sx - this.width * 0.5) / baseScale + baseCx;
+    const wy = baseCy - (sy - this.height * 0.5) / baseScale;
+    const nextScale = Math.max(this.minScale, Math.min(this.maxScale, baseScale * factor));
+    const nextCx = wx - (sx - this.width * 0.5) / nextScale;
+    const nextCy = wy + (sy - this.height * 0.5) / nextScale;
+    this.flyTo(nextCx, nextCy, nextScale, dur);
+  }
+
+  /** Jump immediately to world center `(wx, wy)` preserving zoom (for smooth minimap drag). */
+  jumpToWorld(wx: number, wy: number) {
+    this.anim = null;
+    this.cx = wx;
+    this.cy = wy;
     this.clamp();
-    return true;
+  }
+
+  step(now: number): boolean {
+    let active = false;
+
+    if (this.panVelX !== 0 || this.panVelY !== 0) {
+      const dt = this.lastStepMs === null ? 1 / 60 : Math.min(0.05, Math.max(0.001, (now - this.lastStepMs) / 1000));
+      this.lastStepMs = now;
+      this.cx += (this.panVelX * dt) / this.scale;
+      this.cy -= (this.panVelY * dt) / this.scale;
+      this.clamp();
+      active = true;
+    } else {
+      this.lastStepMs = null;
+    }
+
+    if (this.anim) {
+      const t = Math.min(1, (now - this.anim.t0) / this.anim.dur);
+      const e = 1 - Math.pow(1 - t, 3);
+      this.cx = this.anim.x0 + (this.anim.x1 - this.anim.x0) * e;
+      this.cy = this.anim.y0 + (this.anim.y1 - this.anim.y0) * e;
+      this.scale = Math.exp(Math.log(this.anim.s0) + (Math.log(this.anim.s1) - Math.log(this.anim.s0)) * e);
+      if (t >= 1) this.anim = null;
+      this.clamp();
+      active = true;
+    }
+
+    return active;
   }
 
   worldToScreen(wx: number, wy: number): [number, number] {

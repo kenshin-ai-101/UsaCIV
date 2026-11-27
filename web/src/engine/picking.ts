@@ -62,6 +62,7 @@ export class HexSpatialIndex {
     let best = -1;
     let bestD2 = Infinity;
 
+    const SQRT3_2 = 0.8660254037844386;
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         const list = this.buckets.get(`${gx + dx},${gy + dy}`);
@@ -70,11 +71,17 @@ export class HexSpatialIndex {
           const i = list[k];
           const ddx = wx - this.world.x[i];
           const ddy = wy - this.world.y[i];
-          const d2 = ddx * ddx + ddy * ddy;
-          const r = this.world.r[i] * 1.06;
-          if (d2 <= r * r && d2 < bestD2) {
-            bestD2 = d2;
-            best = i;
+          const r = this.world.r[i] * 1.005;
+          const ax = Math.abs(ddx);
+          const ay = Math.abs(ddy);
+          const apothem = r * SQRT3_2;
+          // Exact point-in-pointy-top-hex test
+          if (ax <= apothem && ax * 0.5 + ay * SQRT3_2 <= apothem) {
+            const d2 = ddx * ddx + ddy * ddy;
+            if (d2 < bestD2) {
+              bestD2 = d2;
+              best = i;
+            }
           }
         }
       }

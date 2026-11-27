@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronUp,
   DollarSign,
@@ -37,7 +37,28 @@ export const LensDock: React.FC<LensDockProps> = ({ lenses, world }) => {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [mapMenuOpen, setMapMenuOpen] = useState(false);
   const dragStartBinRef = useRef<number | null>(null);
+  const pinnedSliceRef = useRef(false);
   const [hoverBin, setHoverBin] = useState<number | null>(null);
+
+  useEffect(() => {
+    pinnedSliceRef.current = false;
+    setHoverBin(null);
+  }, [activeLensId]);
+
+  useEffect(() => {
+    if (!pickerOpen && !mapMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const st = useAppStore.getState();
+      if (st.helpOpen || st.almanacOpen || st.activeTopMetric !== null || st.yieldReportOpen) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setPickerOpen(false);
+      setMapMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [pickerOpen, mapMenuOpen]);
 
   const lensById = useMemo(() => new Map(lenses.map((l) => [l.id, l])), [lenses]);
   const activeLens = activeLensId ? lensById.get(activeLensId) ?? null : null;
@@ -109,7 +130,7 @@ export const LensDock: React.FC<LensDockProps> = ({ lenses, world }) => {
           <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-[var(--border-hairline)]">
             <div>
               <h3 className="font-display text-sm font-bold m-0" style={{ color: 'var(--brass-bright)' }}>{L('全部 19 种真实数据视角', 'All 19 Data Lenses')}</h3>
-              <p className="text-[11px] opacity-65 m-0">{L('按快捷键 L 循环切换；悬停或拖拽图例直方图即可切片过滤地图', 'Press L to cycle lenses; hover or drag across the legend histogram to slice the map')}</p>
+              <p className="text-[11px] opacity-65 m-0">{L('按快捷键 L / Shift+L 循环切换；悬停或拖拽图例直方图即可切片过滤地图', 'Press L / Shift+L to cycle lenses; hover or drag across the legend histogram to slice the map')}</p>
             </div>
             <button onClick={() => setPickerOpen(false)} className="p-1 rounded-lg hover:bg-[var(--surface-paper-hover)] cursor-pointer">
               <X className="w-4 h-4" />
@@ -167,21 +188,37 @@ export const LensDock: React.FC<LensDockProps> = ({ lenses, world }) => {
               </div>
               <p className="text-[10.5px] opacity-75 m-0 mt-0.5 line-clamp-2 leading-snug">{localizeLensDesc(activeLens, locale)}</p>
             </div>
-            <button onClick={() => setLens(null)} className="p-1 rounded hover:bg-[var(--surface-paper-hover)] opacity-70 hover:opacity-100 cursor-pointer" title={L('切回立体地形', 'Return to 2.5D terrain')}>
+            <button onClick={() => setLens(null)} className="p-1 rounded hover:bg-[var(--surface-paper-hover)] opacity-70 hover:opacity-100 cursor-pointer" title={L('切回自然地形', 'Return to terrain')}>
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
           {activeLens.categorical && activeLens.categories ? (
-            <div className="flex flex-wrap gap-1.5 mt-2">
+            <div
+              className="flex flex-wrap gap-1.5 mt-2"
+              onMouseLeave={() => {
+                setHoverBin(null);
+                if (!pinnedSliceRef.current) setBandSlice(null);
+              }}
+            >
               {activeLens.categories.map((cat) => {
-                const isSel = bandSlice && bandSlice[0] === cat.id;
+                const isSel = pinnedSliceRef.current && bandSlice && bandSlice[0] === cat.id;
                 return (
                   <button
                     key={cat.id}
-                    onClick={() => setBandSlice(isSel ? null : [cat.id, cat.id])}
-                    onMouseEnter={() => { if (!bandSlice) setHoverBin(cat.id); }}
-                    onMouseLeave={() => setHoverBin(null)}
+                    onClick={() => {
+                      if (isSel) {
+                        pinnedSliceRef.current = false;
+                        setBandSlice(null);
+                      } else {
+                        pinnedSliceRef.current = true;
+                        setBandSlice([cat.id, cat.id]);
+                      }
+                    }}
+                    onMouseEnter={() => {
+                      setHoverBin(cat.id);
+                      if (!pinnedSliceRef.current) setBandSlice([cat.id, cat.id]);
+                    }}
                     className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[10.5px] border transition cursor-pointer ${
                       isSel ? 'border-[var(--brass)] font-bold scale-105' : 'border-transparent hover:border-[var(--border-hairline)]'
                     }`}
@@ -195,12 +232,13 @@ export const LensDock: React.FC<LensDockProps> = ({ lenses, world }) => {
             </div>
           ) : histogram && (
             <div className="mt-2.5">
-              {/* 24-bin draggable/hoverable histogram */}
+              {/* 24-bin hoverable & draggable histogram */}
               <div
                 className="flex items-end gap-[2px] h-14 select-none cursor-ew-resize"
                 onMouseLeave={() => {
                   setHoverBin(null);
                   if (dragStartBinRef.current !== null) dragStartBinRef.current = null;
+                  if (!pinnedSliceRef.current) setBandSlice(null);
                 }}
                 onMouseUp={() => {
                   dragStartBinRef.current = null;
@@ -212,6 +250,7 @@ export const LensDock: React.FC<LensDockProps> = ({ lenses, world }) => {
                     <div
                       key={b.idx}
                       onMouseDown={() => {
+                        pinnedSliceRef.current = true;
                         dragStartBinRef.current = b.idx;
                         setBandSlice([b.lo, b.hi]);
                       }}
@@ -221,6 +260,8 @@ export const LensDock: React.FC<LensDockProps> = ({ lenses, world }) => {
                           const i0 = Math.min(dragStartBinRef.current, b.idx);
                           const i1 = Math.max(dragStartBinRef.current, b.idx);
                           setBandSlice([histogram[i0].lo, histogram[i1].hi]);
+                        } else if (!pinnedSliceRef.current) {
+                          setBandSlice([b.lo, b.hi]);
                         }
                       }}
                       className="flex-1 rounded-t-[2px] transition-opacity"
@@ -250,13 +291,20 @@ export const LensDock: React.FC<LensDockProps> = ({ lenses, world }) => {
                         `Bin: ${formatMetric(histogram[hoverBin].lo, activeLens.format, locale)} – ${formatMetric(histogram[hoverBin].hi, activeLens.format, locale)} (${histogram[hoverBin].count} hexes)`,
                       )
                     : activeLens.higher_is === 'good'
-                      ? L('▲ 数值越高越优 · 拖拽直方图筛选区间', '▲ Higher is better · Drag bars to slice')
+                      ? L('▲ 数值越高越优 · 悬停或拖拽直方图筛选区间', '▲ Higher is better · Hover or drag bars to slice')
                       : activeLens.higher_is === 'bad'
-                        ? L('▼ 数值越低越优 · 拖拽直方图筛选区间', '▼ Lower is better · Drag bars to slice')
-                        : L('拖拽直方图即可在地图上仅高亮该区间', 'Drag bars to highlight a range on map')}
+                        ? L('▼ 数值越低越优 · 悬停或拖拽直方图筛选区间', '▼ Lower is better · Hover or drag bars to slice')
+                        : L('悬停或拖拽直方图即可仅高亮该区间', 'Hover or drag bars to highlight a range')}
                 </span>
-                {bandSlice ? (
-                  <button onClick={() => setBandSlice(null)} className="underline font-bold cursor-pointer" style={{ color: 'var(--brass-bright)' }}>
+                {bandSlice && pinnedSliceRef.current ? (
+                  <button
+                    onClick={() => {
+                      pinnedSliceRef.current = false;
+                      setBandSlice(null);
+                    }}
+                    className="underline font-bold cursor-pointer"
+                    style={{ color: 'var(--brass-bright)' }}
+                  >
                     {L('重置', 'Reset')}
                   </button>
                 ) : (

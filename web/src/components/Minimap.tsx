@@ -17,7 +17,7 @@ interface MinimapProps {
   activeLens: LensMeta | null;
   cameraRef: React.MutableRefObject<MapCamera>;
   camTick: number;
-  onJump: (wx: number, wy: number) => void;
+  onJump: (wx: number, wy: number, immediate?: boolean) => void;
 }
 
 export const Minimap: React.FC<MinimapProps> = ({ world, meta, activeLens, cameraRef, camTick, onJump }) => {
@@ -98,14 +98,36 @@ export const Minimap: React.FC<MinimapProps> = ({ world, meta, activeLens, camer
     else toggleMinimap();
   };
 
-  const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const px = e.clientX - rect.left;
-    const py = e.clientY - rect.top;
+  const draggingRef = useRef(false);
+
+  const clientToWorld = (clientX: number, clientY: number, el: HTMLCanvasElement): [number, number] => {
+    const rect = el.getBoundingClientRect();
+    const px = clientX - rect.left;
+    const py = clientY - rect.top;
     const [bx0, by0, bx1, by1] = meta.bounds_km;
     const wx = bx0 + ((px - 6) / (W - 12)) * (bx1 - bx0);
     const wy = by1 - ((py - 6) / (H - 12)) * (by1 - by0);
-    onJump(wx, wy);
+    return [wx, wy];
+  };
+
+  const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    draggingRef.current = true;
+    const [wx, wy] = clientToWorld(e.clientX, e.clientY, e.currentTarget);
+    onJump(wx, wy, false);
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!draggingRef.current) return;
+    const [wx, wy] = clientToWorld(e.clientX, e.clientY, e.currentTarget);
+    onJump(wx, wy, true);
+  };
+
+  const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (draggingRef.current) {
+      draggingRef.current = false;
+      try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    }
   };
 
   return (
@@ -115,9 +137,12 @@ export const Minimap: React.FC<MinimapProps> = ({ world, meta, activeLens, camer
           <div className="relative">
             <canvas
               ref={canvasRef}
-              onClick={handleClick}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
               style={{ width: W, height: H }}
-              className="block cursor-crosshair"
+              className="block cursor-crosshair touch-none"
             />
             <button
               onClick={handleToggle}

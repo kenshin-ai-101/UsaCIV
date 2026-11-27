@@ -23,6 +23,7 @@ import { STATE_HERALDIC_COLORS } from '../../features/lenses/lensConfig';
 import { localizeDistrictName } from '../../i18n';
 import type { MapCamera } from '../camera';
 import type { BannerHitBox, PointHitItem } from '../picking';
+import { HEX_DRAW_SCALE } from '../webgl/HexRenderer';
 import {
   drawAirportBadge,
   drawDistrictMiniature,
@@ -77,7 +78,7 @@ function drawHexOutline(ctx: CanvasRenderingContext2D, sx: number, sy: number, r
   for (let i = 0; i < 6; i++) {
     const a = (Math.PI / 180) * (60 * i - 30);
     const px = sx + Math.cos(a) * rPx;
-    const py = sy + Math.sin(a) * rPx;
+    const py = sy - Math.sin(a) * rPx;
     i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
   }
   ctx.closePath();
@@ -440,7 +441,7 @@ export function renderMapOverlay(ctx: CanvasRenderingContext2D, rc: OverlayRende
       for (const hid of layers.protected_hex_ids) {
         const [sx, sy] = camera.worldToScreen(world.x[hid], world.y[hid]);
         if (sx < -30 || sx > w + 30 || sy < -30 || sy > h + 30) continue;
-        drawHexOutline(ctx, sx, sy, world.r[hid] * scale * 0.96);
+        drawHexOutline(ctx, sx, sy, world.r[hid] * scale * HEX_DRAW_SCALE);
         ctx.fill();
         ctx.stroke();
       }
@@ -456,7 +457,7 @@ export function renderMapOverlay(ctx: CanvasRenderingContext2D, rc: OverlayRende
       for (const hid of layers.restricted_hex_ids) {
         const [sx, sy] = camera.worldToScreen(world.x[hid], world.y[hid]);
         if (sx < -30 || sx > w + 30 || sy < -30 || sy > h + 30) continue;
-        drawHexOutline(ctx, sx, sy, world.r[hid] * scale * 0.96);
+        drawHexOutline(ctx, sx, sy, world.r[hid] * scale * HEX_DRAW_SCALE);
         ctx.fill();
         ctx.stroke();
       }
@@ -707,7 +708,7 @@ export function renderMapOverlay(ctx: CanvasRenderingContext2D, rc: OverlayRende
     ctx.lineWidth = Math.max(1.4, scale * 2.2);
     for (const hid of selectedCity.hex_ids) {
       const [sx, sy] = camera.worldToScreen(world.x[hid], world.y[hid]);
-      drawHexOutline(ctx, sx, sy, world.r[hid] * scale * 0.98);
+      drawHexOutline(ctx, sx, sy, world.r[hid] * scale * HEX_DRAW_SCALE);
       ctx.stroke();
     }
     ctx.restore();
@@ -742,13 +743,16 @@ export function renderMapOverlay(ctx: CanvasRenderingContext2D, rc: OverlayRende
     ctx.restore();
   }
 
-  // 15. Hovered Hex Crisp Outline
+  // 15. Hovered Hex Crisp Outline (aligned 1:1 with flat WebGL hex geometry)
   if (hoveredHexId >= 0 && hoveredHexId < world.n) {
     const [sx, sy] = camera.worldToScreen(world.x[hoveredHexId], world.y[hoveredHexId]);
+    const lw = Math.max(1.4, Math.min(2.4, scale * 2.2));
+    const rPx = world.r[hoveredHexId] * scale * HEX_DRAW_SCALE;
     ctx.save();
-    ctx.strokeStyle = isMid ? '#FFE28F' : '#1D242B';
-    ctx.lineWidth = 2.0;
-    drawHexOutline(ctx, sx, sy, world.r[hoveredHexId] * scale);
+    ctx.strokeStyle = isMid ? 'rgba(255, 246, 214, 0.94)' : '#1D242B';
+    ctx.lineWidth = lw;
+    ctx.lineJoin = 'round';
+    drawHexOutline(ctx, sx, sy, rPx);
     ctx.stroke();
     ctx.restore();
   }

@@ -59,6 +59,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   const [query, setQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
+  const [selectedIdx, setSelectedIdx] = useState(0);
   const [anchorCenterX, setAnchorCenterX] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const metricZoneRef = useRef<HTMLDivElement>(null);
@@ -119,15 +120,24 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.key === '/' || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k')) && document.activeElement !== inputRef.current) {
-        if ((document.activeElement as HTMLElement)?.tagName === 'INPUT') return;
-        e.preventDefault();
-        inputRef.current?.focus();
+      const st = useAppStore.getState();
+      const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      const isCmdK = (e.metaKey || e.ctrlKey) && !e.altKey && k === 'k';
+      const isSlash = !e.metaKey && !e.ctrlKey && !e.altKey && e.key === '/';
+      if (!isCmdK && !isSlash) return;
+      if (st.helpOpen || st.almanacOpen) return;
+      if (isSlash) {
+        const el = document.activeElement as HTMLElement | null;
+        if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;
       }
+      e.preventDefault();
+      setActiveTopMetric(null);
+      inputRef.current?.focus();
+      inputRef.current?.select();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [setActiveTopMetric]);
 
   const searchResults = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -334,9 +344,41 @@ export const TopBar: React.FC<TopBarProps> = ({
           <input
             ref={inputRef}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSelectedIdx(0);
+            }}
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setTimeout(() => setSearchFocused(false), 180)}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown' && searchResults.length > 0) {
+                e.preventDefault();
+                setSelectedIdx((idx) => (idx + 1) % searchResults.length);
+              } else if (e.key === 'ArrowUp' && searchResults.length > 0) {
+                e.preventDefault();
+                setSelectedIdx((idx) => (idx - 1 + searchResults.length) % searchResults.length);
+              } else if (e.key === 'Enter' && searchResults.length > 0) {
+                e.preventDefault();
+                const item = searchResults[Math.min(selectedIdx, searchResults.length - 1)];
+                if (item) {
+                  setQuery('');
+                  setSearchFocused(false);
+                  inputRef.current?.blur();
+                  if (item.kind === 'city') openCity(item.id);
+                  else if (item.kind === 'state') openState(item.id);
+                  else onFlyTo(item.x, item.y, 1.45);
+                }
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                if (query) {
+                  setQuery('');
+                } else {
+                  setSearchFocused(false);
+                  inputRef.current?.blur();
+                }
+              }
+            }}
             placeholder={L(
               `搜索 ${geoScope === 'conus' ? (n.conus_metros ?? 524) : cities.length} 城、${geoScope === 'conus' ? 49 : states.length} 州、${n.total_wonders} 奇观...`,
               `Search ${geoScope === 'conus' ? (n.conus_metros ?? 524) : cities.length} metros, ${geoScope === 'conus' ? 49 : states.length} states, ${n.total_wonders} wonders...`,
@@ -353,17 +395,23 @@ export const TopBar: React.FC<TopBarProps> = ({
         </div>
 
         {searchFocused && searchResults.length > 0 && (
-          <div className="atlas-panel-brass absolute top-full mt-1.5 left-0 right-0 rounded-lg overflow-hidden py-1 z-50 max-h-80 overflow-y-auto">
-            {searchResults.map((item) => (
+          <div role="listbox" className="atlas-panel-brass absolute top-full mt-1.5 left-0 right-0 rounded-lg overflow-hidden py-1 z-50 max-h-80 overflow-y-auto">
+            {searchResults.map((item, i) => (
               <button
                 key={`${item.kind}-${item.id}`}
+                role="option"
+                aria-selected={i === selectedIdx}
+                onMouseEnter={() => setSelectedIdx(i)}
                 onMouseDown={() => {
                   setQuery('');
+                  setSearchFocused(false);
                   if (item.kind === 'city') openCity(item.id);
                   else if (item.kind === 'state') openState(item.id);
                   else onFlyTo(item.x, item.y, 1.45);
                 }}
-                className="w-full text-left px-3 py-1.5 hover:bg-[var(--surface-paper-hover)] flex items-center justify-between gap-2 cursor-pointer"
+                className={`w-full text-left px-3 py-1.5 flex items-center justify-between gap-2 cursor-pointer ${
+                  i === selectedIdx ? 'bg-[var(--surface-paper-hover)]' : 'hover:bg-[var(--surface-paper-hover)]'
+                }`}
               >
                 <div className="min-w-0">
                   <div className="text-xs font-semibold truncate">{item.title}</div>
@@ -463,10 +511,11 @@ export const TopBar: React.FC<TopBarProps> = ({
         </button>
 
         <button
-          onClick={() => setHelpOpen(true)}
+          onClick={() => setHelpOpen(!useAppStore.getState().helpOpen)}
           className="dock-btn !p-1.5"
           style={{ borderColor: 'var(--border-hairline)' }}
-          title={L('快捷键与操作帮助', 'Keyboard shortcuts & controls')}
+          title={L('快捷键与操作指南 (?)', 'Help (?)')}
+          aria-label={L('快捷键与鼠标操作帮助', 'Keyboard and mouse help')}
         >
           <HelpCircle className="w-3.5 h-3.5" />
         </button>
@@ -475,7 +524,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           onClick={() => setAlmanacOpen(true, 'sources')}
           className="dock-btn !py-1 !px-2.5"
           style={{ borderColor: 'var(--brass)', background: 'var(--brass-soft)', color: 'var(--brass-bright)' }}
-          title={L('打开《联邦百科全书》与全部 31 项公开数据源链接 (?)', 'Open Federal Almanac & all 31 official data sources (?)')}
+          title={L('打开《联邦百科全书》与全部 31 项公开数据源', 'What every number means and where it comes from')}
         >
           <BookOpen className="w-3.5 h-3.5 shrink-0" />
           <span className="hidden sm:inline">{L('百科', 'Almanac')}</span>

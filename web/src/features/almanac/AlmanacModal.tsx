@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, ExternalLink, Keyboard, Trophy, X } from 'lucide-react';
+import { BookOpen, ExternalLink, Trophy, X } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import {
   localizeDistrictCatalog,
@@ -83,12 +83,12 @@ export const AlmanacModal: React.FC<AlmanacModalProps> = ({ meta }) => {
                 {isEn ? (
                   <p className="m-0 opacity-90">
                     The contiguous U.S. uses <b>NAD83 / Conus Albers (EPSG:5070)</b>, Alaska uses <b>EPSG:3338</b>, and Hawaii uses <b>Hawaii Albers</b> —
-                    tessellated into <b>{meta.hex_count.toLocaleString()}</b> regular 25 km hexagons (<b>541.3 km²</b> each) with 2.5D physical elevation extrusion and northwest hillshading from NOAA ETOPO1.
+                    tessellated into <b>{meta.hex_count.toLocaleString()}</b> flat equal-area 25 km hexagons (<b>541.3 km²</b> each) with elevation and relief derived from NOAA ETOPO1.
                   </p>
                 ) : (
                   <p className="m-0 opacity-90">
                     全美本土采用北美官方等面积投影 <b>NAD83 / Conus Albers (EPSG:5070)</b>，阿拉斯加采用 <b>EPSG:3338</b>，夏威夷采用 <b>Hawaii Albers</b>，
-                    统一划分为中心距 25 km（单格面积 <b>541.3 km²</b>）的 <b>{meta.hex_count.toLocaleString()}</b> 块正六边形，并依据 NOAA ETOPO1 真实海拔进行 2.5D 物理挤压与西北日光晕渲。
+                    统一划分为中心距 25 km（单格面积 <b>541.3 km²</b>）的 <b>{meta.hex_count.toLocaleString()}</b> 块平面等面积正六边形，并依据 NOAA ETOPO1 映射真实海拔与地貌分级。
                   </p>
                 )}
               </div>
@@ -293,37 +293,138 @@ export const YieldReportModal: React.FC<{ cities: CityRecord[]; states: StateRec
 };
 
 export const HelpModal: React.FC = () => {
-  const { L } = useL();
-  const { helpOpen, setHelpOpen } = useAppStore();
+  const { isEn, L } = useL();
+  const { helpOpen, setHelpOpen, setAlmanacOpen } = useAppStore();
   if (!helpOpen) return null;
-  const keys = [
-    [L('拖拽地图 / 滚轮', 'Drag / Scroll'), L('平移与无级缩放 2.5D 六边形沙盘（含阿拉斯加与夏威夷插图框）', 'Pan and zoom the 2.5D hexagonal map (including AK & HI insets)')],
-    [L('点击城市横幅 / 地块', 'Click Banner / Hex'), L('打开《都会区指挥视图》或所属联邦州总览', 'Open Metro Command View or State Overview panel')],
-    [L('/ 或 ⌘K', '/ or ⌘K'), L('全局模糊搜索 524 座都会区、51 个州与全部奇观', 'Global fuzzy search across 524+ metros, 51 states & all wonders')],
-    ['L', L('顺次循环切换 19 种真实数据视角', 'Cycle through all 19 real-data lenses')],
-    ['R', L('一键显隐 EIA 发电厂菱形灯塔、MSHA 矿石晶体与页岩油气纹', 'Toggle EIA power beacons, MSHA ore prisms & shale basin stippling')],
-    ['T', L('切换 WPA 日光羊皮纸版画 / 战情室黄铜夜色双主题', 'Toggle Midnight Cartography / WPA Daylight Atlas themes')],
-    ['Esc', L('关闭当前弹窗或退出城市/顾问/探索器面板并恢复视野', 'Close active modal or side panel and restore map framing')],
+
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+  const modKey = isMac ? '⌘ K' : 'Ctrl K';
+
+  const columns: { heading: string; rows: { keys: string[]; desc: string }[] }[] = [
+    {
+      heading: L('移动与缩放', 'MOVE'),
+      rows: [
+        { keys: [L('拖拽', 'Drag'), '←↑→↓', 'WASD'], desc: L('平移地图', 'Pan the map') },
+        { keys: [L('滚轮', 'Scroll'), '+', '–'], desc: L('放大与缩小', 'Zoom in and out') },
+        { keys: [L('双击', 'Double-click')], desc: L('放大该位置', 'Zoom in on a spot') },
+        { keys: [L('双指', 'Two fingers')], desc: L('捏合缩放、拖拽平移（触控）', 'Pinch to zoom, drag to pan (touch)') },
+        { keys: [L('小地图', 'Minimap')], desc: L('点击或拖拽快速跳转', 'Click or drag to jump') },
+      ],
+    },
+    {
+      heading: L('探索与视角', 'EXPLORE'),
+      rows: [
+        { keys: [L('点击城市', 'Click city')], desc: L('打开都会区指挥视图', 'Open the city screen') },
+        { keys: [L('点击陆地', 'Click land')], desc: L('打开所属州总览', 'Open that state') },
+        { keys: ['/', modKey], desc: L('搜索城市与州', 'Search cities and states') },
+        { keys: ['L', 'Shift L'], desc: L('切换下一个 / 上一个视角', 'Next / previous lens') },
+        { keys: [L('图例', 'Legend')], desc: L('悬停或拖拽色阶仅显示该区间', 'Hover or drag the scale to show only that range') },
+        { keys: ['R'], desc: L('显示或隐藏资源节点', 'Show or hide resources') },
+      ],
+    },
+    {
+      heading: L('面板与弹窗', 'PANELS'),
+      rows: [
+        { keys: ['?'], desc: L('打开或关闭本帮助', 'This help') },
+        { keys: ['Esc'], desc: L('依次关闭帮助、搜索、百科与侧边面板', 'Close help, search, Almanac, then the panel') },
+      ],
+    },
   ];
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-center justify-center p-3" onClick={() => setHelpOpen(false)}>
-      <div className="atlas-panel-brass w-[min(460px,94vw)] rounded-2xl p-4" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between pb-2.5 mb-3 border-b border-[var(--border-hairline)]">
-          <span className="font-display text-sm font-bold flex items-center gap-2">
-            <Keyboard className="w-4 h-4" style={{ color: 'var(--brass)' }} /> {L('快捷键与操作指南', 'Shortcuts & Controls')}
-          </span>
-          <button onClick={() => setHelpOpen(false)} className="p-1 rounded hover:bg-[var(--surface-paper-hover)] cursor-pointer">
+    <div
+      className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm flex items-center justify-center p-3"
+      onClick={() => setHelpOpen(false)}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="help-title"
+        className="atlas-panel-brass w-[min(740px,94vw)] rounded-2xl p-5 sm:p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between pb-3 mb-4">
+          <h2 id="help-title" className="font-display text-lg font-bold tracking-wider uppercase m-0 flex items-center gap-2.5" style={{ color: 'var(--brass-bright)' }}>
+            <span className="font-serif text-xl leading-none opacity-85">?</span>
+            <span>{L('快捷键与操作指南', 'CONTROLS')}</span>
+          </h2>
+          <button
+            type="button"
+            onClick={() => setHelpOpen(false)}
+            aria-label={L('关闭帮助', 'Close help')}
+            className="w-8 h-8 rounded-full border flex items-center justify-center hover:bg-[var(--surface-paper-hover)] transition cursor-pointer"
+            style={{ borderColor: 'var(--brass)', color: 'var(--brass-bright)' }}
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="space-y-2 text-xs">
-          {keys.map(([k, desc]) => (
-            <div key={k} className="flex items-start justify-between gap-3">
-              <kbd className="font-mono-num text-[11px] font-bold px-2 py-0.5 rounded bg-[var(--surface-paper-subtle)] border border-[var(--border-hairline)] shrink-0">{k}</kbd>
-              <span className="opacity-80 text-right">{desc}</span>
-            </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {columns.map((col) => (
+            <section key={col.heading} className="space-y-3">
+              <h3
+                className="text-[11px] font-bold tracking-[0.12em] uppercase pb-1.5 border-b m-0"
+                style={{ color: 'var(--brass)', borderColor: 'var(--border-hairline)' }}
+              >
+                {col.heading}
+              </h3>
+              <div className="space-y-2.5">
+                {col.rows.map((row) => (
+                  <div key={row.keys.join('+')} className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-1">
+                      {row.keys.map((k) => (
+                        <kbd
+                          key={k}
+                          className="font-mono-num text-[11px] font-semibold px-1.5 py-0.5 rounded bg-[var(--surface-paper-subtle)] border border-[var(--border-strong)] leading-tight"
+                          style={{ color: 'var(--brass-bright)' }}
+                        >
+                          {k}
+                        </kbd>
+                      ))}
+                    </div>
+                    <div className="text-[12px] leading-snug opacity-85">{row.desc}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
+
+        <p className="text-[11.5px] opacity-75 mt-5 pt-3.5 border-t border-[var(--border-hairline)] mb-0 leading-relaxed">
+          {isEn ? (
+            <>
+              Every number traces back to public data: open the{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setHelpOpen(false);
+                  setAlmanacOpen(true, 'sources');
+                }}
+                className="font-bold underline hover:opacity-100 cursor-pointer"
+                style={{ color: 'var(--brass-bright)' }}
+              >
+                Almanac
+              </button>{' '}
+              for sources. The link in the address bar always reopens this exact view.
+            </>
+          ) : (
+            <>
+              所有数值均可追溯至公开数据：打开{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setHelpOpen(false);
+                  setAlmanacOpen(true, 'sources');
+                }}
+                className="font-bold underline hover:opacity-100 cursor-pointer"
+                style={{ color: 'var(--brass-bright)' }}
+              >
+                百科
+              </button>{' '}
+              查看全部 31 项数据源。地址栏链接可随时复现当前视图。
+            </>
+          )}
+        </p>
       </div>
     </div>
   );
