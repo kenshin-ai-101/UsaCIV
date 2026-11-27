@@ -11,6 +11,7 @@ import {
   type PointHitItem,
 } from './engine/picking';
 import { useAppStore } from './store/useAppStore';
+import { useL } from './i18n';
 import { TopBar } from './components/TopBar';
 import { LensDock } from './components/LensDock';
 import { MapTooltip } from './components/MapTooltip';
@@ -31,6 +32,7 @@ import type {
 } from './types/world';
 
 export default function App() {
+  const { locale, L } = useL();
   const {
     theme,
     mode,
@@ -114,7 +116,11 @@ export default function App() {
           fetch('/data/states.json'),
         ]);
         if (!mRes.ok || !wRes.ok || !cRes.ok || !sRes.ok) {
-          throw new Error('数据文件加载失败，请确认 pipeline 已生成 web/public/data/*.json');
+          throw new Error(
+            useAppStore.getState().locale === 'en'
+              ? 'Failed to load data files. Verify that the ETL pipeline generated web/public/data/*.json.'
+              : '数据文件加载失败，请确认 pipeline 已生成 web/public/data/*.json',
+          );
         }
         const [m, w, c, s] = await Promise.all([mRes.json(), wRes.json(), cRes.json(), sRes.json()]);
         if (cancelled) return;
@@ -125,6 +131,9 @@ export default function App() {
         hexIndexRef.current = new HexSpatialIndex(w);
 
         const hash = new URLSearchParams(initialHashRef.current.replace(/^#/, ''));
+        if (hash.get('lang') === 'en' || hash.get('lang') === 'zh') {
+          useAppStore.getState().setLocale(hash.get('lang') as 'en' | 'zh');
+        }
         if (hash.get('theme') === 'daylight') useAppStore.getState().setTheme('daylight');
         if (hash.get('lens')) useAppStore.getState().setLens(hash.get('lens'));
         if (hash.get('city')) useAppStore.getState().openCity(hash.get('city')!);
@@ -157,6 +166,7 @@ export default function App() {
   useEffect(() => {
     if (!hashHydratedRef.current) return;
     const p = new URLSearchParams();
+    if (locale === 'en') p.set('lang', 'en');
     if (theme === 'daylight') p.set('theme', 'daylight');
     if (activeLensId) p.set('lens', activeLensId);
     if (mode === 'city' && selectedCityId) p.set('city', selectedCityId);
@@ -166,7 +176,7 @@ export default function App() {
     else if (mode === 'showdown') p.set('mode', 'showdown');
     const s = p.toString();
     window.history.replaceState(null, '', s ? `#${s}` : window.location.pathname);
-  }, [theme, activeLensId, mode, selectedCityId, selectedStateFips, activeAdvisorId]);
+  }, [locale, theme, activeLensId, mode, selectedCityId, selectedStateFips, activeAdvisorId]);
 
   const activeLens = useMemo(
     () => (meta && activeLensId ? meta.lenses.find((l) => l.id === activeLensId) ?? null : null),
@@ -296,7 +306,7 @@ export default function App() {
 
   useEffect(() => {
     requestDraw();
-  }, [layersData, toggles, theme, activeLens, advisorFuelFilters, advisorBubbles, advisorDimTerrain, hoveredBubbleId, showdownCities, requestDraw]);
+  }, [layersData, toggles, theme, locale, activeLens, advisorFuelFilters, advisorBubbles, advisorDimTerrain, hoveredBubbleId, showdownCities, requestDraw]);
 
   useEffect(() => {
     if (!meta || !world) return;
@@ -320,7 +330,7 @@ export default function App() {
         const ctx = bg.getContext('2d');
         if (ctx) {
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-          renderBackdropSea(ctx, cam, meta, layersData, theme);
+          renderBackdropSea(ctx, cam, meta, layersData, theme, locale);
         }
       }
 
@@ -337,6 +347,7 @@ export default function App() {
           hitStateRef.current = renderMapOverlay(ctx, {
             camera: cam,
             theme,
+            locale,
             meta,
             world,
             cities,
@@ -361,7 +372,7 @@ export default function App() {
     rafId = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(rafId);
   }, [
-    meta, world, cities, states, layersData, toggles, theme, activeLens,
+    meta, world, cities, states, layersData, toggles, theme, locale, activeLens,
     selectedCity, hoveredHexId, advisorFuelFilters, advisorBubbles, advisorDimTerrain, hoveredBubbleId, showdownCities,
   ]);
 
@@ -510,19 +521,19 @@ export default function App() {
     a.download = `terra-americana-${activeLens?.id ?? 'terrain'}.png`;
     a.href = out.toDataURL('image/png');
     a.click();
-    showToast('已导出高清地图 PNG 快照');
-  }, [activeLens, showToast]);
+    showToast(L('已导出高清地图 PNG 快照', 'Exported HD map PNG snapshot'));
+  }, [activeLens, showToast, locale]);
 
   const copyShareLink = useCallback(() => {
     navigator.clipboard?.writeText(window.location.href).catch(() => {});
-    showToast('已复制当前视图分享链接');
-  }, [showToast]);
+    showToast(L('已复制当前视图分享链接', 'Copied share link for current view'));
+  }, [showToast, locale]);
 
   if (loadErr) {
     return (
       <div className="w-full h-full flex items-center justify-center p-6 text-center">
         <div className="atlas-panel-brass max-w-md p-6 rounded-2xl space-y-2">
-          <h1 className="font-display text-lg font-bold">数据加载异常</h1>
+          <h1 className="font-display text-lg font-bold">{L('数据加载异常', 'Data Load Error')}</h1>
           <p className="text-xs opacity-80">{loadErr}</p>
         </div>
       </div>
@@ -535,8 +546,8 @@ export default function App() {
         <div className="w-10 h-10 rounded-full flex items-center justify-center font-display text-lg font-bold animate-pulse border-2" style={{ background: '#1B3A66', borderColor: 'var(--brass)', color: '#F7E7B8' }}>
           ★
         </div>
-        <div className="font-display text-base font-bold" style={{ color: 'var(--brass-bright)' }}>正在测绘联邦版图…</div>
-        <div className="text-xs opacity-65">加载 31 项美国真实公开数据 · 18,284 块 25 km 等面积六边形</div>
+        <div className="font-display text-base font-bold" style={{ color: 'var(--brass-bright)' }}>{L('正在测绘联邦版图…', 'Charting the United States…')}</div>
+        <div className="text-xs opacity-65">{L('加载 31 项美国真实公开数据 · 18,284 块 25 km 等面积六边形', 'Loading 31 U.S. federal datasets · 18,284 equal-area 25 km hexes')}</div>
       </div>
     );
   }

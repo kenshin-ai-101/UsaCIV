@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, ExternalLink, Search } from 'lucide-react';
 import { COLOR_RAMPS, formatMetric, sampleRamp } from '../lenses/lensConfig';
+import { useL } from '../../i18n';
 import type { SourceRecord } from '../../types/world';
 
 /** Compact formatter for counts & money matching editorial 3-sig-fig style */
@@ -99,27 +100,30 @@ export const MapPickerBar: React.FC<{
   value: string;
   options: { value: string; label: string }[];
   onChange: (v: string) => void;
-}> = ({ value, options, onChange }) => (
-  <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-[var(--border-hairline)] bg-black/20">
-    <span className="text-[10px] uppercase tracking-wider opacity-60 shrink-0">地图着色</span>
-    <div className="flex flex-wrap gap-1 justify-end">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          onClick={() => onChange(o.value)}
-          className={`px-2 py-0.5 rounded text-[10.5px] font-semibold transition cursor-pointer ${
-            o.value === value
-              ? 'bg-[var(--brass)] text-[#141B24]'
-              : 'bg-white/5 opacity-75 hover:opacity-100'
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
+}> = ({ value, options, onChange }) => {
+  const { L } = useL();
+  return (
+    <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-[var(--border-hairline)] bg-black/20">
+      <span className="text-[10px] uppercase tracking-wider opacity-60 shrink-0">{L('地图着色', 'Map Color')}</span>
+      <div className="flex flex-wrap gap-1 justify-end">
+        {options.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onChange(o.value)}
+            className={`px-2 py-0.5 rounded text-[10.5px] font-semibold transition cursor-pointer ${
+              o.value === value
+                ? 'bg-[var(--brass)] text-[#141B24]'
+                : 'bg-white/5 opacity-75 hover:opacity-100'
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 /** 5. Horizontal Multi-Segment Proportional Share Bar (with hover & optional legend) */
 export const ShareBar: React.FC<{
@@ -382,6 +386,7 @@ export const InteractiveHistogram: React.FC<{
   onHoverRange,
   onPinBin,
 }) => {
+  const { locale, L } = useL();
   const [hoverInfo, setHoverInfo] = useState<string | null>(null);
 
   const hist = useMemo(() => {
@@ -463,7 +468,10 @@ export const InteractiveHistogram: React.FC<{
             <div
               key={b.idx}
               onMouseEnter={() => {
-                const txt = `${formatMetric(b.loVal, fmt)} – ${formatMetric(b.hiVal, fmt)}：${b.count.toLocaleString()} 县${b.totalPop > 0 ? ` · ${fmtCount3(b.totalPop)} 人` : ''}`;
+                const txt = L(
+                  `${formatMetric(b.loVal, fmt, locale)} – ${formatMetric(b.hiVal, fmt, locale)}：${b.count.toLocaleString()} 县${b.totalPop > 0 ? ` · ${fmtCount3(b.totalPop)} 人` : ''}`,
+                  `${formatMetric(b.loVal, fmt, locale)} – ${formatMetric(b.hiVal, fmt, locale)}: ${b.count.toLocaleString()} counties${b.totalPop > 0 ? ` · ${fmtCount3(b.totalPop)} pop` : ''}`,
+                );
                 setHoverInfo(txt);
                 onHoverRange(new Set(b.hexIds), txt);
               }}
@@ -480,11 +488,11 @@ export const InteractiveHistogram: React.FC<{
         })}
       </div>
       <div className="flex justify-between text-[9.5px] font-mono-num opacity-70 mt-1 gap-2">
-        <span>{formatMetric(hist.bins[0].loVal, fmt)}</span>
+        <span>{formatMetric(hist.bins[0].loVal, fmt, locale)}</span>
         <span className="truncate text-center text-amber-200/90">
-          {hoverInfo ?? (onPinBin ? '悬停高亮 · 点击锁定区间' : '悬停直方柱联动地图')}
+          {hoverInfo ?? (onPinBin ? L('悬停高亮 · 点击锁定区间', 'Hover to highlight · Click to pin') : L('悬停直方柱联动地图', 'Hover bars to highlight map'))}
         </span>
-        <span>{formatMetric(hist.bins[hist.bins.length - 1].hiVal, fmt)}</span>
+        <span>{formatMetric(hist.bins[hist.bins.length - 1].hiVal, fmt, locale)}</span>
       </div>
     </div>
   );
@@ -539,6 +547,7 @@ export const BrushScatter: React.FC<{
   onClickPoint,
   onBrush,
 }) => {
+  const { locale, L } = useL();
   const svgRef = useRef<SVGSVGElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [tip, setTip] = useState<string | null>(null);
@@ -659,7 +668,7 @@ export const BrushScatter: React.FC<{
   };
 
   if (!layout) {
-    return <div className="p-4 text-center text-[11px] opacity-60 rounded-lg bg-black/20">当前筛选下无有效散点数据</div>;
+    return <div className="p-4 text-center text-[11px] opacity-60 rounded-lg bg-black/20">{L('当前筛选下无有效散点数据', 'No valid scatter points under current filter')}</div>;
   }
 
   return (
@@ -691,7 +700,7 @@ export const BrushScatter: React.FC<{
             const hit = findNearestPt(pt.x, pt.y);
             if (hit?.id !== hotPtId) {
               setHotPtId(hit?.id ?? null);
-              setTip(hit ? `${hit.label}${hit.sub ? ` (${hit.sub})` : ''} · ${xLabel} ${formatMetric(hit.x, xFmt)} · ${yLabel} ${formatMetric(hit.y, yFmt)}${hit.extraTip ? ` · ${hit.extraTip}` : ''}` : null);
+              setTip(hit ? `${hit.label}${hit.sub ? ` (${hit.sub})` : ''} · ${xLabel} ${formatMetric(hit.x, xFmt, locale)} · ${yLabel} ${formatMetric(hit.y, yFmt, locale)}${hit.extraTip ? ` · ${hit.extraTip}` : ''}` : null);
               onHoverPoint?.(hit);
             }
           }
@@ -745,10 +754,10 @@ export const BrushScatter: React.FC<{
               {(f === 0 || f === 0.5 || f === 1) && (
                 <>
                   <text x={gx} y={H - pad.b + 11} textAnchor={f === 0 ? 'start' : f === 1 ? 'end' : 'middle'} fontSize="8.5" fill="currentColor" opacity="0.58">
-                    {formatMetric(rawX, xFmt)}
+                    {formatMetric(rawX, xFmt, locale)}
                   </text>
                   <text x={pad.l - 4} y={gy + 3} textAnchor="end" fontSize="8.5" fill="currentColor" opacity="0.58">
-                    {formatMetric(rawY, yFmt)}
+                    {formatMetric(rawY, yFmt, locale)}
                   </text>
                 </>
               )}
@@ -818,7 +827,7 @@ export const BrushScatter: React.FC<{
               strokeWidth={selectedIds && inSel ? 1.1 : 0.5}
               className="cursor-pointer hover:stroke-white hover:stroke-2"
               onMouseEnter={() => {
-                setTip(`${p.label}${p.sub ? ` (${p.sub})` : ''} · ${xLabel} ${formatMetric(p.x, xFmt)} · ${yLabel} ${formatMetric(p.y, yFmt)}${p.extraTip ? ` · ${p.extraTip}` : ''}`);
+                setTip(`${p.label}${p.sub ? ` (${p.sub})` : ''} · ${xLabel} ${formatMetric(p.x, xFmt, locale)} · ${yLabel} ${formatMetric(p.y, yFmt, locale)}${p.extraTip ? ` · ${p.extraTip}` : ''}`);
                 onHoverPoint?.(p);
               }}
               onMouseLeave={() => {
@@ -899,7 +908,11 @@ export const BrushScatter: React.FC<{
       </svg>
       </div>
       <div className="text-[10px] font-mono-num opacity-75 mt-1 min-h-[15px] truncate">
-        {tip ?? `共 ${layout.pts.length.toLocaleString()} 个节点 · ${onBrush ? '拖拽框选联动地图 · ' : ''}悬停查看，点击飞镜`}
+        {tip ??
+          L(
+            `共 ${layout.pts.length.toLocaleString()} 个节点 · ${onBrush ? '拖拽框选联动地图 · ' : ''}悬停查看，点击飞镜`,
+            `${layout.pts.length.toLocaleString()} points · ${onBrush ? 'Drag to brush map · ' : ''}Hover to inspect, click to fly`,
+          )}
       </div>
     </div>
   );
@@ -941,6 +954,7 @@ export function SortableTable<T extends { id: string }>({
   onHover?: (r: T | null) => void;
   onClick?: (r: T) => void;
 }) {
+  const { L } = useL();
   const [q, setQ] = useState('');
   const [sortKey, setSortKey] = useState(defaultSort);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>(defaultDir);
@@ -1005,7 +1019,7 @@ export function SortableTable<T extends { id: string }>({
             placeholder={searchPlaceholder}
             className="w-full bg-transparent outline-none text-[11px] placeholder:opacity-50"
           />
-          <span className="text-[10px] font-mono-num opacity-65 shrink-0">共 {totalCount.toLocaleString()} 条</span>
+          <span className="text-[10px] font-mono-num opacity-65 shrink-0">{L(`共 ${totalCount.toLocaleString()} 条`, `${totalCount.toLocaleString()} rows`)}</span>
         </div>
       )}
       <div
@@ -1084,7 +1098,7 @@ export function SortableTable<T extends { id: string }>({
             {totalCount === 0 && (
               <tr>
                 <td colSpan={colSpan} className="py-4 text-center opacity-55">
-                  无匹配条目
+                  {L('无匹配条目', 'No matching entries')}
                 </td>
               </tr>
             )}
@@ -1214,6 +1228,7 @@ export const SmallMultiplesDonuts: React.FC<{
 export const AnnualColumnChart: React.FC<{
   items: { year: number; count: number; cost_busd: number }[];
 }> = ({ items }) => {
+  const { L } = useL();
   const [tip, setTip] = useState<string | null>(null);
   if (items.length === 0) return null;
   const maxC = Math.max(1, ...items.map((x) => x.count));
@@ -1233,7 +1248,14 @@ export const AnnualColumnChart: React.FC<{
               height={h}
               fill="#cf6a4a"
               className="hover:fill-amber-300 cursor-pointer transition-colors"
-              onMouseEnter={() => setTip(`${it.year} 年：${it.count} 起十亿美元级灾害 · 损失 $${it.cost_busd.toFixed(1)}B`)}
+              onMouseEnter={() =>
+                setTip(
+                  L(
+                    `${it.year} 年：${it.count} 起十亿美元级灾害 · 损失 $${it.cost_busd.toFixed(1)}B`,
+                    `${it.year}: ${it.count} billion-dollar events · $${it.cost_busd.toFixed(1)}B loss`,
+                  ),
+                )
+              }
               onMouseLeave={() => setTip(null)}
             />
           );
@@ -1241,10 +1263,10 @@ export const AnnualColumnChart: React.FC<{
         <line x1={ml} x2={W - mr} y1={H - mb + 0.5} y2={H - mb + 0.5} stroke="rgba(255,255,255,0.18)" />
         <text x={ml + 2} y={H - 4} fontSize="8.5" fill="currentColor" opacity="0.65">{items[0].year}</text>
         <text x={W - mr - 2} y={H - 4} textAnchor="end" fontSize="8.5" fill="currentColor" opacity="0.65">{items[items.length - 1].year}</text>
-        <text x={ml + 3} y={mt + 2} fontSize="8.5" fill="currentColor" opacity="0.65">峰值 {maxC} 起/年</text>
+        <text x={ml + 3} y={mt + 2} fontSize="8.5" fill="currentColor" opacity="0.65">{L(`峰值 ${maxC} 起/年`, `Peak ${maxC}/yr`)}</text>
       </svg>
       <div className="text-[10px] font-mono-num opacity-75 mt-1 min-h-[14px]">
-        {tip ?? '悬停任意年份查看十亿美元级灾害次数与通胀调整后损失'}
+        {tip ?? L('悬停任意年份查看十亿美元级灾害次数与通胀调整后损失', 'Hover any year for billion-dollar event count & CPI-adjusted loss')}
       </div>
     </div>
   );
@@ -1256,6 +1278,7 @@ export const SourcesFooter: React.FC<{
   sourceIds: string[];
   notes: string[];
 }> = ({ sources, sourceIds, notes }) => {
+  const { L } = useL();
   const byId = useMemo(() => new Map(sources.map((s) => [s.id, s])), [sources]);
   const list = useMemo(
     () => Array.from(new Set(sourceIds)).map((id) => byId.get(id)).filter((s): s is SourceRecord => Boolean(s)),
@@ -1264,7 +1287,7 @@ export const SourcesFooter: React.FC<{
   return (
     <div className="pt-3 mt-2 border-t border-[var(--border-hairline)] space-y-2 text-[10.5px] opacity-80">
       <div className="text-[9.5px] font-bold uppercase tracking-widest" style={{ color: 'var(--brass)' }}>
-        数据来源与统计口径说明 · SOURCES &amp; NOTES
+        {L('数据来源与统计口径说明 · SOURCES & NOTES', 'SOURCES & METHODOLOGY NOTES')}
       </div>
       {notes.length > 0 && (
         <ul className="space-y-1 pl-3.5 list-disc leading-relaxed m-0 opacity-85">

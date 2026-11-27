@@ -1,13 +1,13 @@
-import type { LensMeta, ThemeMode } from '../../types/world';
+import type { LensMeta, Locale, ThemeMode } from '../../types/world';
 
-export const LENS_GROUPS: { id: LensMeta['group']; label: string }[] = [
-  { id: 'people', label: '人口结构 People' },
-  { id: 'prosperity', label: '繁荣与住房 Prosperity' },
-  { id: 'knowledge', label: '科技与知识 Knowledge' },
-  { id: 'life', label: '日常生活 Daily Life' },
-  { id: 'faith', label: '宗教信仰 Faith' },
-  { id: 'hazards', label: '灾害风险 Hazards' },
-  { id: 'land', label: '地表覆被 Land' },
+export const LENS_GROUPS: { id: LensMeta['group']; label: string; labelEn: string }[] = [
+  { id: 'people', label: '人口结构', labelEn: 'People' },
+  { id: 'prosperity', label: '繁荣与住房', labelEn: 'Prosperity & Housing' },
+  { id: 'knowledge', label: '科技与知识', labelEn: 'Knowledge' },
+  { id: 'life', label: '日常生活', labelEn: 'Daily Life' },
+  { id: 'faith', label: '宗教信仰', labelEn: 'Faith' },
+  { id: 'hazards', label: '灾害风险', labelEn: 'Hazards' },
+  { id: 'land', label: '地表覆被', labelEn: 'Land Cover' },
 ];
 
 export const QUICK_LENS_IDS = ['density', 'income', 'bachelors'];
@@ -90,8 +90,8 @@ export function getNullColor(theme: ThemeMode): [number, number, number] {
   return theme === 'daylight' ? [0.80, 0.78, 0.74] : [0.22, 0.25, 0.30];
 }
 
-export function formatMetric(val: number | null | undefined, fmt: string): string {
-  if (val === null || val === undefined || Number.isNaN(val)) return '无观测';
+export function formatMetric(val: number | null | undefined, fmt: string, locale: Locale = 'zh'): string {
+  if (val === null || val === undefined || Number.isNaN(val)) return locale === 'en' ? 'No data' : '无观测';
   switch (fmt) {
     case 'usd':
       if (Math.abs(val) >= 1_000_000_000_000) return '$' + (val / 1e12).toFixed(2) + 'T';
@@ -110,7 +110,7 @@ export function formatMetric(val: number | null | undefined, fmt: string): strin
     case 'pct':
       return (val * 100).toFixed(1) + '%';
     case 'min':
-      return val.toFixed(1) + ' 分钟';
+      return val.toFixed(1) + (locale === 'en' ? ' min' : ' 分钟');
     case 'dec1':
       return val.toFixed(1);
     case 'index':

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { useL } from '../i18n';
 import {
   BIOME_COLORS_DAY,
   BIOME_COLORS_MIDNIGHT,
@@ -20,6 +21,7 @@ interface MinimapProps {
 }
 
 export const Minimap: React.FC<MinimapProps> = ({ world, meta, activeLens, cameraRef, camTick, onJump }) => {
+  const { L } = useL();
   const { minimapOpen, toggleMinimap, theme, mode } = useAppStore();
   const [dockExpanded, setDockExpanded] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -120,7 +122,7 @@ export const Minimap: React.FC<MinimapProps> = ({ world, meta, activeLens, camer
             <button
               onClick={handleToggle}
               className="absolute top-1.5 right-1.5 p-1 rounded bg-black/50 text-amber-200 hover:bg-black/75 cursor-pointer"
-              title="折叠小地图"
+              title={L('折叠小地图', 'Collapse minimap')}
             >
               <Minimize2 className="w-3 h-3" />
             </button>
@@ -131,7 +133,7 @@ export const Minimap: React.FC<MinimapProps> = ({ world, meta, activeLens, camer
           onClick={handleToggle}
           className="atlas-panel-brass px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
         >
-          <Maximize2 className="w-3.5 h-3.5" style={{ color: 'var(--brass)' }} /> 小地图
+          <Maximize2 className="w-3.5 h-3.5" style={{ color: 'var(--brass)' }} /> {L('小地图', 'Minimap')}
         </button>
       )}
     </div>

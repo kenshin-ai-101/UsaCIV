@@ -1,5 +1,9 @@
 import { create } from 'zustand';
-import type { LayerToggles, MapMode, ThemeMode } from '../types/world';
+import type { LayerToggles, Locale, MapMode, ThemeMode } from '../types/world';
+import { applyDocumentLocale, detectInitialLocale, LOCALE_STORAGE_KEY } from '../i18n/localeUtils';
+
+const initialLocale: Locale = detectInitialLocale();
+applyDocumentLocale(initialLocale);
 
 export type TopMetricId =
   | 'population'
@@ -26,6 +30,7 @@ export interface MapBubbleSpec {
 
 export interface AppState {
   theme: ThemeMode;
+  locale: Locale;
   geoScope: 'conus' | 'all';
   mode: MapMode;
   activeLensId: string | null;
@@ -60,6 +65,8 @@ export interface AppState {
 
   // Actions
   setTheme: (t: ThemeMode) => void;
+  setLocale: (l: Locale) => void;
+  toggleLocale: () => void;
   setGeoScope: (scope: 'conus' | 'all') => void;
   toggleTheme: () => void;
   setLens: (id: string | null) => void;
@@ -87,6 +94,7 @@ export interface AppState {
 
 export const useAppStore = create<AppState>((set) => ({
   theme: 'midnight',
+  locale: initialLocale,
   geoScope: 'conus',
   mode: 'explore',
   activeLensId: null,
@@ -130,6 +138,26 @@ export const useAppStore = create<AppState>((set) => ({
     document.documentElement.setAttribute('data-theme', theme);
     set({ theme });
   },
+  setLocale: (locale) => {
+    applyDocumentLocale(locale);
+    try {
+      window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+    } catch {
+      // ignore storage errors
+    }
+    set({ locale });
+  },
+  toggleLocale: () =>
+    set((s) => {
+      const next: Locale = s.locale === 'zh' ? 'en' : 'zh';
+      applyDocumentLocale(next);
+      try {
+        window.localStorage.setItem(LOCALE_STORAGE_KEY, next);
+      } catch {
+        // ignore storage errors
+      }
+      return { locale: next };
+    }),
   setGeoScope: (geoScope) => set({ geoScope }),
   toggleTheme: () =>
     set((s) => {

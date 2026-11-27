@@ -14,6 +14,7 @@ import {
   type ScatterPoint,
 } from '../advisors/AdvisorCharts';
 import { sampleRamp } from '../lenses/lensConfig';
+import { localizeDistrictName, localizeRegion, useL } from '../../i18n';
 import type { CityRecord, CountiesDataset, StateRecord, WorldHexData, WorldMeta } from '../../types/world';
 
 interface CountyExplorerPanelProps {
@@ -31,12 +32,16 @@ type FieldFmt = 'int' | 'money' | 'usd' | 'pct' | 'signed' | 'dec1' | 'ratio' | 
 interface FieldSpec {
   key: string;
   label: string;
+  labelEn: string;
   short: string;
+  shortEn: string;
   group: string;
+  groupEn: string;
   format: FieldFmt;
   lens?: string;
   higherBad?: boolean;
   desc: string;
+  descEn: string;
 }
 
 interface ActiveFilter {
@@ -58,63 +63,63 @@ interface UnifiedRow {
 }
 
 const ALL_FIELDS: FieldSpec[] = [
-  { key: 'sub', label: '所属州', short: '州', group: '基础', format: 'text', desc: '行政归属州简称' },
-  { key: 'region', label: '地理大区', short: '大区', group: '基础', format: 'text', desc: '美国人口普查局四大地理分区' },
-  { key: 'kind', label: '都会层级', short: '层级', group: '基础', format: 'text', desc: '大都会统计区 (Metro, ≥5万核心) 或微都会区 (Micro, 1万–5万核心)' },
-  { key: 'land_km2', label: '陆地面积 km²', short: '面积', group: '基础', format: 'int', desc: 'TIGER/Line 陆地面积 (平方公里)' },
-  { key: 'pop', label: '总人口', short: '人口', group: '人口', format: 'int', lens: 'density', desc: '常住人口 (Census PEP 2025 / ACS 5-Yr)' },
-  { key: 'growth', label: '人口增速 21–25', short: '增速', group: '人口', format: 'signed', desc: 'Census PEP 2021–2025 人口净变化率' },
-  { key: 'density', label: '人口密度', short: '密度', group: '人口', format: 'dec1', lens: 'density', desc: '每平方公里陆地常住人口数' },
-  { key: 'age', label: '中位年龄', short: '年龄', group: '人口', format: 'dec1', lens: 'age', desc: '居民中位年龄 (岁)' },
-  { key: 'foreign_born', label: '外国出生占比', short: '移民', group: '人口', format: 'pct', lens: 'foreign_born', desc: '出生在美国境外的人口占比' },
-  { key: 'cz_child', label: '18岁以下占比', short: '少儿', group: '市民结构', format: 'pct', desc: '18岁以下人口占比 (ACS 1-Yr B01001)' },
-  { key: 'cz_young', label: '18–34岁占比', short: '青年', group: '市民结构', format: 'pct', desc: '18–34岁青年人口占比 (ACS 1-Yr B01001)' },
-  { key: 'cz_elder', label: '65岁以上占比', short: '老年', group: '市民结构', format: 'pct', desc: '65岁以上老年人口占比 (ACS 1-Yr B01001)' },
-  { key: 'cz_born_in_state', label: '本州出生占比', short: '本土生', group: '市民结构', format: 'pct', desc: '出生在当前居住州的人口占比 (ACS 1-Yr B05002)' },
-  { key: 'cz_drove_alone', label: '独自驾车通勤', short: '独驾', group: '市民结构', format: 'pct', desc: '独自驾车通勤的就业者占比 (ACS 1-Yr C08301)' },
-  { key: 'cz_transit', label: '公共交通通勤', short: '公交', group: '市民结构', format: 'pct', desc: '搭乘公共交通通勤的就业者占比 (ACS 1-Yr C08301)' },
-  { key: 'cz_walk', label: '步行通勤占比', short: '步行', group: '市民结构', format: 'pct', desc: '步行通勤的就业者占比 (ACS 1-Yr C08301)' },
-  { key: 'cz_home', label: '居家办公占比', short: '居家', group: '市民结构', format: 'pct', desc: '居家远程办公的就业者占比 (ACS 1-Yr C08301)' },
-  { key: 'cz_graduate', label: '研究生及以上', short: '硕博', group: '市民结构', format: 'pct', desc: '25岁+ 持有研究生或专业学位占比 (ACS 1-Yr C15003)' },
-  { key: 'gdp', label: '真实 GDP', short: 'GDP', group: '经济', format: 'money', desc: 'BEA CAGDP2 2024 现价 GDP (含弗吉尼亚独立市县合并拆分)' },
-  { key: 'gdp_pc', label: '人均 GDP', short: '人均GDP', group: '经济', format: 'usd', desc: 'BEA GDP ÷ 常住人口' },
-  { key: 'city_type', label: '城市原型', short: '原型', group: '经济与城区', format: 'text', desc: '基于 BLS QCEW 就业区位熵识别的都会主导产业原型' },
-  { key: 'n_districts', label: '特色城区数', short: '城区数', group: '经济与城区', format: 'int', desc: '满足高区位熵/就业门槛的特色产业城区数量' },
-  { key: 'qcew_jobs', label: 'QCEW 私营就业', short: 'QCEW就业', group: '经济与城区', format: 'int', desc: 'BLS QCEW 2024 年度覆盖岗位总数' },
-  { key: 'qcew_pay', label: 'QCEW 平均年薪', short: 'QCEW年薪', group: '经济与城区', format: 'usd', desc: 'BLS QCEW 2024 雇员年均薪酬' },
-  { key: 'top_lq', label: '最强区位熵 LQ', short: '最强LQ', group: '经济与城区', format: 'ratio', desc: '都会区最强特色城区相对全美均值的就业集中倍数' },
-  { key: 'income', label: '家庭中位收入', short: '收入', group: '繁荣与住房', format: 'usd', lens: 'income', desc: '家庭中位年收入 (ACS)' },
-  { key: 'home', label: '房价中位数', short: '房价', group: '繁荣与住房', format: 'usd', lens: 'home', desc: '自有住房估值中位数 (ACS)' },
-  { key: 'affordability', label: '房价收入比', short: '房价/收入', group: '繁荣与住房', format: 'ratio', higherBad: true, desc: '房价中位数 ÷ 家庭中位收入' },
-  { key: 'rent', label: '月租金中位数', short: '月租', group: '繁荣与住房', format: 'usd', desc: '月租金中位数 (ACS 1-Yr)' },
-  { key: 'rent_burden', label: '房租收入比', short: '房租比', group: '繁荣与住房', format: 'pct', higherBad: true, desc: '年租金 ÷ 家庭中位收入' },
-  { key: 'unemployment', label: '失业率', short: '失业率', group: '繁荣与住房', format: 'pct', higherBad: true, desc: '失业人数 ÷ 平民劳动力 (ACS 2025 B23025)' },
-  { key: 'poverty', label: '贫困率', short: '贫困率', group: '繁荣与住房', format: 'pct', lens: 'poverty', higherBad: true, desc: '低于联邦贫困线人口占比' },
-  { key: 'homeownership', label: '住房自有率', short: '自有率', group: '繁荣与住房', format: 'pct', lens: 'homeownership', desc: '自住住房占比' },
-  { key: 'uninsured', label: '无医保比例', short: '无医保', group: '繁荣与住房', format: 'pct', lens: 'uninsured', higherBad: true, desc: '无医疗保险覆盖人口占比' },
-  { key: 'bachelors', label: '本科及以上学历', short: '本科率', group: '知识', format: 'pct', lens: 'bachelors', desc: '25岁+ 成人本科及以上学历占比' },
-  { key: 'broadband', label: '宽带普及率', short: '宽带', group: '知识', format: 'pct', lens: 'broadband', desc: '家庭宽带互联网订阅率' },
-  { key: 'y_science', label: '科研信息就业', short: '科研就业', group: '产出', format: 'int', desc: '专业科研与信息业就业人数 (ACS C24030)' },
-  { key: 'y_food', label: '农林渔牧就业', short: '农业就业', group: '产出', format: 'int', desc: '农林渔牧业就业人数 (ACS C24030)' },
-  { key: 'y_prod', label: '制造建筑采矿就业', short: '工业就业', group: '产出', format: 'int', desc: '制造/建筑/采矿业就业人数 (ACS C24030)' },
-  { key: 'amenities', label: '健康宜居指数', short: '宜居', group: '生活与灾害', format: 'index', lens: 'amenities', desc: 'CDC PLACES 4 项身心健康反向 Z 指数 (100=均值；KY/PA 缺席)' },
-  { key: 'commute', label: '平均通勤(分)', short: '通勤', group: '生活与灾害', format: 'dec1', lens: 'commute', higherBad: true, desc: '单程平均通勤分钟数' },
-  { key: 'faith_rate', label: '宗教信徒率', short: '信徒率', group: '生活与灾害', format: 'dec1', lens: 'faith', desc: '每百名居民信徒数 (USRC 2020；康涅狄格州缺席)' },
-  { key: 'disasters', label: 'FEMA 灾害数', short: '灾害', group: '生活与灾害', format: 'int', lens: 'disasters', higherBad: true, desc: '2000 年以来独立重大灾害声明数' },
-  { key: 'veterans_pct', label: '退伍军人占比', short: '退伍占比', group: '国防', format: 'pct', lens: 'veterans', desc: '18岁+ 平民中退伍军人占比' },
-  { key: 'armed_forces_pct', label: '现役居民占比', short: '现役占比', group: '国防', format: 'pct', desc: '16岁+ 居民中现役军人占比' },
-  { key: 'installations', label: '军事基地数', short: '基地数', group: '国防', format: 'int', desc: 'DoD MIRTA 2025 入图军事基地与设施数' },
-  { key: 'encampment', label: '军营等级', short: '军营', group: '国防', format: 'text', desc: 'Fortress (重镇 ≥5,000 现役) 或 Garrison (驻军 ≥1,000 或 ≥3%)' },
-  { key: 'mil_active', label: '现役军人 (DMDC)', short: '现役', group: '国防', format: 'int', desc: 'DoD DMDC 2025 州级驻扎现役人数' },
-  { key: 'mil_guard_reserve', label: '国民警卫队/预备役', short: '预备役', group: '国防', format: 'int', desc: 'DoD DMDC 2025 州级国民警卫队与预备役人数' },
-  { key: 'mil_civilian', label: '国防部文职', short: '文职', group: '国防', format: 'int', desc: 'DoD DMDC 2025 州级国防部文职人数' },
-  { key: 'def_spending', label: '国防支出', short: '防务$', group: '国防', format: 'money', desc: 'OLDCC FY2024 州级国防合同/薪资/拨款总额' },
-  { key: 'def_per_resident', label: '人均国防支出', short: '人均防务', group: '国防', format: 'usd', desc: 'OLDCC FY2024 国防支出 ÷ 常住人口' },
-  { key: 'def_pct_gdp', label: '防务占 GDP', short: '防务%GDP', group: '国防', format: 'pct', desc: 'OLDCC FY2024 国防支出 ÷ 州级 GDP' },
-  { key: 'forest', label: '森林覆被率', short: '森林', group: '土地', format: 'pct', lens: 'forest', desc: 'NLCD 森林覆被占比' },
-  { key: 'farmland', label: '农田覆被率', short: '农田', group: '土地', format: 'pct', lens: 'farmland', desc: 'NLCD 耕地与牧场占比' },
-  { key: 'developed', label: '建成区占比', short: '建成区', group: '土地', format: 'pct', lens: 'developed', desc: 'NLCD 城镇建设用地占比' },
-  { key: 'energy_mw', label: '入图电力 MW', short: '电力MW', group: '土地', format: 'int', desc: '门槛以上入图大型电厂装机 (MW)' },
+  { key: 'sub', label: '所属州', labelEn: 'State', short: '州', shortEn: 'St', group: '基础', groupEn: 'Basics', format: 'text', desc: '行政归属州简称', descEn: 'State abbreviation' },
+  { key: 'region', label: '地理大区', labelEn: 'Census Region', short: '大区', shortEn: 'Region', group: '基础', groupEn: 'Basics', format: 'text', desc: '美国人口普查局四大地理分区', descEn: 'Four U.S. Census regions' },
+  { key: 'kind', label: '都会层级', labelEn: 'Area Tier', short: '层级', shortEn: 'Tier', group: '基础', groupEn: 'Basics', format: 'text', desc: '大都会统计区 (Metro, ≥5万核心) 或微都会区 (Micro, 1万–5万核心)', descEn: 'Metropolitan (≥50K core) or Micropolitan (10K–50K core) statistical area' },
+  { key: 'land_km2', label: '陆地面积 km²', labelEn: 'Land Area km²', short: '面积', shortEn: 'Area', group: '基础', groupEn: 'Basics', format: 'int', desc: 'TIGER/Line 陆地面积 (平方公里)', descEn: 'TIGER/Line land area (km²)' },
+  { key: 'pop', label: '总人口', labelEn: 'Population', short: '人口', shortEn: 'Pop', group: '人口', groupEn: 'People', format: 'int', lens: 'density', desc: '常住人口 (Census PEP 2025 / ACS 5-Yr)', descEn: 'Resident population (Census PEP 2025 / ACS 5-Yr)' },
+  { key: 'growth', label: '人口增速 21–25', labelEn: 'Pop Growth 21–25', short: '增速', shortEn: 'Growth', group: '人口', groupEn: 'People', format: 'signed', desc: 'Census PEP 2021–2025 人口净变化率', descEn: 'Census PEP 2021–2025 net population change rate' },
+  { key: 'density', label: '人口密度', labelEn: 'Pop Density', short: '密度', shortEn: 'Dens.', group: '人口', groupEn: 'People', format: 'dec1', lens: 'density', desc: '每平方公里陆地常住人口数', descEn: 'Residents per km² of land' },
+  { key: 'age', label: '中位年龄', labelEn: 'Median Age', short: '年龄', shortEn: 'Age', group: '人口', groupEn: 'People', format: 'dec1', lens: 'age', desc: '居民中位年龄 (岁)', descEn: 'Median resident age (years)' },
+  { key: 'foreign_born', label: '外国出生占比', labelEn: 'Foreign-Born %', short: '移民', shortEn: 'Intl%', group: '人口', groupEn: 'People', format: 'pct', lens: 'foreign_born', desc: '出生在美国境外的人口占比', descEn: 'Share of residents born outside the U.S.' },
+  { key: 'cz_child', label: '18岁以下占比', labelEn: 'Under 18 %', short: '少儿', shortEn: '<18', group: '市民结构', groupEn: 'Demographics', format: 'pct', desc: '18岁以下人口占比 (ACS 1-Yr B01001)', descEn: 'Population under age 18 (ACS 1-Yr B01001)' },
+  { key: 'cz_young', label: '18–34岁占比', labelEn: 'Age 18–34 %', short: '青年', shortEn: '18–34', group: '市民结构', groupEn: 'Demographics', format: 'pct', desc: '18–34岁青年人口占比 (ACS 1-Yr B01001)', descEn: 'Young adult share age 18–34 (ACS 1-Yr B01001)' },
+  { key: 'cz_elder', label: '65岁以上占比', labelEn: 'Age 65+ %', short: '老年', shortEn: '65+', group: '市民结构', groupEn: 'Demographics', format: 'pct', desc: '65岁以上老年人口占比 (ACS 1-Yr B01001)', descEn: 'Senior share age 65+ (ACS 1-Yr B01001)' },
+  { key: 'cz_born_in_state', label: '本州出生占比', labelEn: 'Born in State %', short: '本土生', shortEn: 'Native', group: '市民结构', groupEn: 'Demographics', format: 'pct', desc: '出生在当前居住州的人口占比 (ACS 1-Yr B05002)', descEn: 'Share born in their state of residence (ACS 1-Yr B05002)' },
+  { key: 'cz_drove_alone', label: '独自驾车通勤', labelEn: 'Drove Alone %', short: '独驾', shortEn: 'Drive', group: '市民结构', groupEn: 'Demographics', format: 'pct', desc: '独自驾车通勤的就业者占比 (ACS 1-Yr C08301)', descEn: 'Workers commuting solo by car (ACS 1-Yr C08301)' },
+  { key: 'cz_transit', label: '公共交通通勤', labelEn: 'Public Transit %', short: '公交', shortEn: 'Transit', group: '市民结构', groupEn: 'Demographics', format: 'pct', desc: '搭乘公共交通通勤的就业者占比 (ACS 1-Yr C08301)', descEn: 'Workers commuting by public transit (ACS 1-Yr C08301)' },
+  { key: 'cz_walk', label: '步行通勤占比', labelEn: 'Walk to Work %', short: '步行', shortEn: 'Walk', group: '市民结构', groupEn: 'Demographics', format: 'pct', desc: '步行通勤的就业者占比 (ACS 1-Yr C08301)', descEn: 'Workers walking to work (ACS 1-Yr C08301)' },
+  { key: 'cz_home', label: '居家办公占比', labelEn: 'Work From Home %', short: '居家', shortEn: 'WFH', group: '市民结构', groupEn: 'Demographics', format: 'pct', desc: '居家远程办公的就业者占比 (ACS 1-Yr C08301)', descEn: 'Workers working from home (ACS 1-Yr C08301)' },
+  { key: 'cz_graduate', label: '研究生及以上', labelEn: 'Graduate Degree %', short: '硕博', shortEn: 'Grad', group: '市民结构', groupEn: 'Demographics', format: 'pct', desc: '25岁+ 持有研究生或专业学位占比 (ACS 1-Yr C15003)', descEn: 'Adults 25+ with graduate/professional degree (ACS 1-Yr C15003)' },
+  { key: 'gdp', label: '真实 GDP', labelEn: 'Real GDP', short: 'GDP', shortEn: 'GDP', group: '经济', groupEn: 'Economy', format: 'money', desc: 'BEA CAGDP2 2024 现价 GDP (含弗吉尼亚独立市县合并拆分)', descEn: 'BEA CAGDP2 2024 current-dollar GDP (incl. VA independent-city split)' },
+  { key: 'gdp_pc', label: '人均 GDP', labelEn: 'GDP per Capita', short: '人均GDP', shortEn: 'GDP/c', group: '经济', groupEn: 'Economy', format: 'usd', desc: 'BEA GDP ÷ 常住人口', descEn: 'BEA GDP ÷ resident population' },
+  { key: 'city_type', label: '城市原型', labelEn: 'Metro Archetype', short: '原型', shortEn: 'Type', group: '经济与城区', groupEn: 'Districts', format: 'text', desc: '基于 BLS QCEW 就业区位熵识别的都会主导产业原型', descEn: 'Primary metro specialization identified from BLS QCEW Location Quotients' },
+  { key: 'n_districts', label: '特色城区数', labelEn: 'District Count', short: '城区数', shortEn: 'Dist.', group: '经济与城区', groupEn: 'Districts', format: 'int', desc: '满足高区位熵/就业门槛的特色产业城区数量', descEn: 'Number of specialized industry districts meeting LQ/employment rules' },
+  { key: 'qcew_jobs', label: 'QCEW 私营就业', labelEn: 'QCEW Payroll Jobs', short: 'QCEW就业', shortEn: 'Jobs', group: '经济与城区', groupEn: 'Districts', format: 'int', desc: 'BLS QCEW 2024 年度覆盖岗位总数', descEn: 'BLS QCEW 2024 annual covered employment' },
+  { key: 'qcew_pay', label: 'QCEW 平均年薪', labelEn: 'QCEW Avg Annual Pay', short: 'QCEW年薪', shortEn: 'Pay', group: '经济与城区', groupEn: 'Districts', format: 'usd', desc: 'BLS QCEW 2024 雇员年均薪酬', descEn: 'BLS QCEW 2024 average annual pay per worker' },
+  { key: 'top_lq', label: '最强区位熵 LQ', labelEn: 'Top District LQ', short: '最强LQ', shortEn: 'Top LQ', group: '经济与城区', groupEn: 'Districts', format: 'ratio', desc: '都会区最强特色城区相对全美均值的就业集中倍数', descEn: 'Highest specialized district employment concentration vs. U.S. avg' },
+  { key: 'income', label: '家庭中位收入', labelEn: 'Median Household Income', short: '收入', shortEn: 'Income', group: '繁荣与住房', groupEn: 'Prosperity', format: 'usd', lens: 'income', desc: '家庭中位年收入 (ACS)', descEn: 'Median annual household income (ACS)' },
+  { key: 'home', label: '房价中位数', labelEn: 'Median Home Value', short: '房价', shortEn: 'Home', group: '繁荣与住房', groupEn: 'Prosperity', format: 'usd', lens: 'home', desc: '自有住房估值中位数 (ACS)', descEn: 'Median owner-occupied home value (ACS)' },
+  { key: 'affordability', label: '房价收入比', labelEn: 'Home / Income Ratio', short: '房价/收入', shortEn: 'H/Inc', group: '繁荣与住房', groupEn: 'Prosperity', format: 'ratio', higherBad: true, desc: '房价中位数 ÷ 家庭中位收入', descEn: 'Median home value ÷ median household income' },
+  { key: 'rent', label: '月租金中位数', labelEn: 'Median Monthly Rent', short: '月租', shortEn: 'Rent', group: '繁荣与住房', groupEn: 'Prosperity', format: 'usd', desc: '月租金中位数 (ACS 1-Yr)', descEn: 'Median gross monthly rent (ACS 1-Yr)' },
+  { key: 'rent_burden', label: '房租收入比', labelEn: 'Rent-to-Income %', short: '房租比', shortEn: 'Rent%', group: '繁荣与住房', groupEn: 'Prosperity', format: 'pct', higherBad: true, desc: '年租金 ÷ 家庭中位收入', descEn: 'Annual median rent ÷ median household income' },
+  { key: 'unemployment', label: '失业率', labelEn: 'Unemployment Rate', short: '失业率', shortEn: 'Unemp', group: '繁荣与住房', groupEn: 'Prosperity', format: 'pct', higherBad: true, desc: '失业人数 ÷ 平民劳动力 (ACS 2025 B23025)', descEn: 'Unemployed ÷ civilian labor force (ACS 2025 B23025)' },
+  { key: 'poverty', label: '贫困率', labelEn: 'Poverty Rate', short: '贫困率', shortEn: 'Pov.', group: '繁荣与住房', groupEn: 'Prosperity', format: 'pct', lens: 'poverty', higherBad: true, desc: '低于联邦贫困线人口占比', descEn: 'Share below federal poverty threshold' },
+  { key: 'homeownership', label: '住房自有率', labelEn: 'Homeownership %', short: '自有率', shortEn: 'Own%', group: '繁荣与住房', groupEn: 'Prosperity', format: 'pct', lens: 'homeownership', desc: '自住住房占比', descEn: 'Owner-occupied share of housing units' },
+  { key: 'uninsured', label: '无医保比例', labelEn: 'Uninsured Rate', short: '无医保', shortEn: 'Unins.', group: '繁荣与住房', groupEn: 'Prosperity', format: 'pct', lens: 'uninsured', higherBad: true, desc: '无医疗保险覆盖人口占比', descEn: 'Share without health insurance coverage' },
+  { key: 'bachelors', label: '本科及以上学历', labelEn: 'Bachelor’s+ %', short: '本科率', shortEn: 'BA+%', group: '知识', groupEn: 'Knowledge', format: 'pct', lens: 'bachelors', desc: '25岁+ 成人本科及以上学历占比', descEn: 'Adults age 25+ with bachelor’s degree or higher' },
+  { key: 'broadband', label: '宽带普及率', labelEn: 'Broadband %', short: '宽带', shortEn: 'BB%', group: '知识', groupEn: 'Knowledge', format: 'pct', lens: 'broadband', desc: '家庭宽带互联网订阅率', descEn: 'Share of households with paid broadband' },
+  { key: 'y_science', label: '科研信息就业', labelEn: 'Science & Info Jobs', short: '科研就业', shortEn: 'Sci', group: '产出', groupEn: 'Yields', format: 'int', desc: '专业科研与信息业就业人数 (ACS C24030)', descEn: 'Scientific, technical & information workers (ACS C24030)' },
+  { key: 'y_food', label: '农林渔牧就业', labelEn: 'Agri & Forestry Jobs', short: '农业就业', shortEn: 'Agri', group: '产出', groupEn: 'Yields', format: 'int', desc: '农林渔牧业就业人数 (ACS C24030)', descEn: 'Agriculture, forestry & fishing workers (ACS C24030)' },
+  { key: 'y_prod', label: '制造建筑采矿就业', labelEn: 'Goods-Producing Jobs', short: '工业就业', shortEn: 'Prod', group: '产出', groupEn: 'Yields', format: 'int', desc: '制造/建筑/采矿业就业人数 (ACS C24030)', descEn: 'Manufacturing, construction & mining workers (ACS C24030)' },
+  { key: 'amenities', label: '健康宜居指数', labelEn: 'Wellbeing Index', short: '宜居', shortEn: 'Well.', group: '生活与灾害', groupEn: 'Life & Risk', format: 'index', lens: 'amenities', desc: 'CDC PLACES 4 项身心健康反向 Z 指数 (100=均值；KY/PA 缺席)', descEn: 'CDC PLACES 4-indicator inverted Z-index (100=avg; KY/PA missing)' },
+  { key: 'commute', label: '平均通勤(分)', labelEn: 'Mean Commute (min)', short: '通勤', shortEn: 'Comm.', group: '生活与灾害', groupEn: 'Life & Risk', format: 'dec1', lens: 'commute', higherBad: true, desc: '单程平均通勤分钟数', descEn: 'Mean one-way commute time in minutes' },
+  { key: 'faith_rate', label: '宗教信徒率', labelEn: 'Adherents / 100', short: '信徒率', shortEn: 'Faith', group: '生活与灾害', groupEn: 'Life & Risk', format: 'dec1', lens: 'faith', desc: '每百名居民信徒数 (USRC 2020；康涅狄格州缺席)', descEn: 'Religious adherents per 100 residents (USRC 2020; CT missing)' },
+  { key: 'disasters', label: 'FEMA 灾害数', labelEn: 'FEMA Disasters', short: '灾害', shortEn: 'FEMA', group: '生活与灾害', groupEn: 'Life & Risk', format: 'int', lens: 'disasters', higherBad: true, desc: '2000 年以来独立重大灾害声明数', descEn: 'Distinct federal Major Disaster Declarations since 2000' },
+  { key: 'veterans_pct', label: '退伍军人占比', labelEn: 'Veterans %', short: '退伍占比', shortEn: 'Vet%', group: '国防', groupEn: 'Defense', format: 'pct', lens: 'veterans', desc: '18岁+ 平民中退伍军人占比', descEn: 'Veterans share of civilian population age 18+' },
+  { key: 'armed_forces_pct', label: '现役居民占比', labelEn: 'Active-Duty %', short: '现役占比', shortEn: 'Mil%', group: '国防', groupEn: 'Defense', format: 'pct', desc: '16岁+ 居民中现役军人占比', descEn: 'Active-duty armed forces share of residents age 16+' },
+  { key: 'installations', label: '军事基地数', labelEn: 'Installations', short: '基地数', shortEn: 'Bases', group: '国防', groupEn: 'Defense', format: 'int', desc: 'DoD MIRTA 2025 入图军事基地与设施数', descEn: 'Mapped DoD MIRTA FY2025 military installations' },
+  { key: 'encampment', label: '军营等级', labelEn: 'Garrison Tier', short: '军营', shortEn: 'Tier', group: '国防', groupEn: 'Defense', format: 'text', desc: 'Fortress (重镇 ≥5,000 现役) 或 Garrison (驻军 ≥1,000 或 ≥3%)', descEn: 'Fortress (≥3% active-duty) or Garrison metro status' },
+  { key: 'mil_active', label: '现役军人 (DMDC)', labelEn: 'Active Duty (DMDC)', short: '现役', shortEn: 'Active', group: '国防', groupEn: 'Defense', format: 'int', desc: 'DoD DMDC 2025 州级驻扎现役人数', descEn: 'DoD DMDC state active-duty personnel' },
+  { key: 'mil_guard_reserve', label: '国民警卫队/预备役', labelEn: 'Guard & Reserve', short: '预备役', shortEn: 'Guard', group: '国防', groupEn: 'Defense', format: 'int', desc: 'DoD DMDC 2025 州级国民警卫队与预备役人数', descEn: 'DoD DMDC state Guard & Reserve personnel' },
+  { key: 'mil_civilian', label: '国防部文职', labelEn: 'DoD Civilian', short: '文职', shortEn: 'Civ.', group: '国防', groupEn: 'Defense', format: 'int', desc: 'DoD DMDC 2025 州级国防部文职人数', descEn: 'DoD DMDC state civilian personnel' },
+  { key: 'def_spending', label: '国防支出', labelEn: 'Defense Spending', short: '防务$', shortEn: 'Def$', group: '国防', groupEn: 'Defense', format: 'money', desc: 'OLDCC FY2024 州级国防合同/薪资/拨款总额', descEn: 'OLDCC FY2024 state defense contracts, payroll & grants' },
+  { key: 'def_per_resident', label: '人均国防支出', labelEn: 'Defense / Resident', short: '人均防务', shortEn: 'Def/c', group: '国防', groupEn: 'Defense', format: 'usd', desc: 'OLDCC FY2024 国防支出 ÷ 常住人口', descEn: 'OLDCC FY2024 defense spending per resident' },
+  { key: 'def_pct_gdp', label: '防务占 GDP', labelEn: 'Defense % GDP', short: '防务%GDP', shortEn: 'Def%', group: '国防', groupEn: 'Defense', format: 'pct', desc: 'OLDCC FY2024 国防支出 ÷ 州级 GDP', descEn: 'OLDCC FY2024 defense spending as % of state GDP' },
+  { key: 'forest', label: '森林覆被率', labelEn: 'Forest Cover %', short: '森林', shortEn: 'Forest', group: '土地', groupEn: 'Land', format: 'pct', lens: 'forest', desc: 'NLCD 森林覆被占比', descEn: 'NLCD forest land-cover share' },
+  { key: 'farmland', label: '农田覆被率', labelEn: 'Farmland Cover %', short: '农田', shortEn: 'Farm', group: '土地', groupEn: 'Land', format: 'pct', lens: 'farmland', desc: 'NLCD 耕地与牧场占比', descEn: 'NLCD cropland & pasture share' },
+  { key: 'developed', label: '建成区占比', labelEn: 'Developed Cover %', short: '建成区', shortEn: 'Urban', group: '土地', groupEn: 'Land', format: 'pct', lens: 'developed', desc: 'NLCD 城镇建设用地占比', descEn: 'NLCD developed urban cover share' },
+  { key: 'energy_mw', label: '入图电力 MW', labelEn: 'Mapped Power MW', short: '电力MW', shortEn: 'MW', group: '土地', groupEn: 'Land', format: 'int', desc: '门槛以上入图大型电厂装机 (MW)', descEn: 'Mapped large power plant capacity (MW)' },
 ];
 
 const FIELD_MAP = new Map(ALL_FIELDS.map((f) => [f.key, f]));
@@ -178,7 +183,12 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
   world,
   onFlyTo,
 }) => {
+  const { locale, isEn, L } = useL();
   const { setBrushed, setLens, activeLensId, openCity, openState, setAdvisorVisuals, geoScope, setGeoScope } = useAppStore();
+  const fLabel = (f: FieldSpec) => (isEn ? f.labelEn : f.label);
+  const fShort = (f: FieldSpec) => (isEn ? f.shortEn : f.short);
+  const fGroup = (f: FieldSpec) => (isEn ? f.groupEn : f.group);
+  const fDesc = (f: FieldSpec) => (isEn ? f.descEn : f.desc);
 
   const saved = useMemo(() => {
     try { return JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch { return null; }
@@ -243,7 +253,7 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
         id: s.fips,
         name: s.name,
         sub: s.abbr,
-        region: s.region_name,
+        region: localizeRegion(s.region_name, locale),
         land_km2: s.land_km2 ?? null,
         x: s.x,
         y: s.y,
@@ -293,7 +303,7 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
         id: c.id,
         name: c.short_name,
         sub: (c.states_sub ?? c.state_abbr).replace(/\s+(Metro|Micro)\s+Area$/i, ''),
-        region: ['Northeast', 'Midwest', 'South', 'West'][c.region] ?? 'West',
+        region: localizeRegion(['Northeast', 'Midwest', 'South', 'West'][c.region] ?? 'West', locale),
         kind: c.is_metro ? 'Metro' : 'Micro',
         land_km2: c.land_km2 ?? null,
         x: c.x,
@@ -315,7 +325,7 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
         cz_graduate: c.citizens_extra?.cz_graduate ?? null,
         gdp: c.gdp_musd != null ? c.gdp_musd * 1e6 : null,
         gdp_pc: c.gdp_per_cap,
-        city_type: c.city_type ?? null,
+        city_type: c.city_type ? localizeDistrictName(c.primary_district ?? '', c.city_type, locale) : null,
         n_districts: c.n_districts ?? c.districts.length,
         qcew_jobs: c.qcew_jobs ?? null,
         qcew_pay: c.qcew_pay ?? null,
@@ -341,7 +351,7 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
         veterans_pct: c.veterans_pct ?? null,
         armed_forces_pct: c.armed_forces_pct ?? null,
         installations: c.installations_count ?? 0,
-        encampment: c.garrison_tier === 'fortress' ? 'Fortress' : c.garrison_tier === 'garrison' ? 'Garrison' : 'None',
+        encampment: c.garrison_tier === 'fortress' ? L('要塞', 'Fortress') : c.garrison_tier === 'garrison' ? L('驻军', 'Garrison') : L('无', 'None'),
         energy_mw: c.energy_mw ?? null,
       }));
     }
@@ -349,7 +359,7 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
       id: r.fips,
       name: r.name,
       sub: r.state,
-      region: r.region_name,
+      region: localizeRegion(r.region_name, locale),
       x: r.x,
       y: r.y,
       hexIds: r.hex_ids,
@@ -379,7 +389,7 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
       developed: typeof r.developed === 'number' ? r.developed : null,
       energy_mw: typeof r.power_mw === 'number' ? r.power_mw : null,
     }));
-  }, [level, scopedStates, scopedCities, scopedCountyRows, stateHexMap]);
+  }, [level, scopedStates, scopedCities, scopedCountyRows, stateHexMap, locale]);
 
   // Fields populated for this level (scan all rows so sparse columns like city_type appear reliably)
   const availableFields = useMemo(() => {
@@ -506,12 +516,12 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
         const cv = r[fc.key];
         if (fc.format === 'text') {
           col = catMap.get(String(cv ?? '–')) ?? '#8b8070';
-          extra = `${fc.short}: ${cv ?? '–'}`;
+          extra = `${fShort(fc)}: ${cv ?? '–'}`;
         } else if (typeof cv === 'number') {
           const t = maxC > minC ? (cv - minC) / (maxC - minC) : 0.5;
           const rgb = sampleRamp(rampKey, t);
           col = `rgb(${Math.round(rgb[0] * 255)},${Math.round(rgb[1] * 255)},${Math.round(rgb[2] * 255)})`;
-          extra = `${fc.short}: ${fmtCellVal(cv, fc.format)}`;
+          extra = `${fShort(fc)}: ${fmtCellVal(cv, fc.format)}`;
         }
       }
       pts.push({
@@ -531,11 +541,11 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
     const legend = fc
       ? fc.format === 'text'
         ? { kind: 'cat' as const, items: [...catMap.entries()].map(([label, color]) => ({ label, color })) }
-        : { kind: 'num' as const, ramp: rampKey as 'risk' | 'wealth', minLabel: fmtCellVal(minC, fc.format), maxLabel: fmtCellVal(maxC, fc.format), title: fc.label }
+        : { kind: 'num' as const, ramp: rampKey as 'risk' | 'wealth', minLabel: fmtCellVal(minC, fc.format), maxLabel: fmtCellVal(maxC, fc.format), title: fLabel(fc) }
       : null;
 
     return { scatterPts: pts, colorLegend: legend };
-  }, [filteredRows, level, fx, fy, fs, fc, logX, logY]);
+  }, [filteredRows, level, fx, fy, fs, fc, logX, logY, locale]);
 
   const topLabelIds = useMemo(
     () => new Set([...filteredRows].sort((a, b) => Number(b.pop ?? 0) - Number(a.pop ?? 0)).slice(0, level === 'states' ? 10 : 6).map((r) => r.id)),
@@ -576,12 +586,13 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
   const groupedFields = useMemo(() => {
     const m = new Map<string, FieldSpec[]>();
     for (const f of availableFields) {
-      let arr = m.get(f.group);
-      if (!arr) { arr = []; m.set(f.group, arr); }
+      const g = fGroup(f);
+      let arr = m.get(g);
+      if (!arr) { arr = []; m.set(g, arr); }
       arr.push(f);
     }
     return [...m.entries()];
-  }, [availableFields]);
+  }, [availableFields, locale]);
 
   const lensFields = useMemo(() => {
     const out: FieldSpec[] = [];
@@ -616,7 +627,7 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
 
       {/* Compact Geographic Scope Toggle (Default = Lower 48 + DC for exact 49 / 524 / 3,109 parity) */}
       <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-[var(--border-hairline)] bg-black/15 shrink-0 text-[10.5px]">
-        <span className="opacity-65">统计范围</span>
+        <span className="opacity-65">{L('统计范围', 'Scope')}</span>
         <div className="inline-flex rounded-md border border-[var(--border-hairline)] bg-black/25 p-0.5 gap-0.5">
           <button
             type="button"
@@ -625,7 +636,10 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
               geoScope === 'conus' ? 'bg-[var(--brass)] text-[#141B24]' : 'opacity-70 hover:opacity-100'
             }`}
           >
-            本土 48 州+DC ({conusStateCount}州·{conusCityCount}城·{conusCountyCount.toLocaleString()}县)
+            {L(
+              `本土 48 州+DC (${conusStateCount}州·${conusCityCount}城·${conusCountyCount.toLocaleString()}县)`,
+              `Lower 48+DC (${conusStateCount} · ${conusCityCount} · ${conusCountyCount.toLocaleString()})`,
+            )}
           </button>
           <button
             type="button"
@@ -634,7 +648,7 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
               geoScope === 'all' ? 'bg-[var(--brass)] text-[#141B24]' : 'opacity-70 hover:opacity-100'
             }`}
           >
-            含 AK/HI ({states.length}州·{cities.length}城)
+            {L(`含 AK/HI (${states.length}州·${cities.length}城)`, `Incl. AK/HI (${states.length} · ${cities.length})`)}
           </button>
         </div>
       </div>
@@ -650,9 +664,9 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
               <Table2 className="w-4 h-4" />
             </div>
             <div>
-              <div className="text-[9.5px] font-bold uppercase tracking-widest opacity-60">CARTOGRAPHER · 制图师工作台</div>
+              <div className="text-[9.5px] font-bold uppercase tracking-widest opacity-60">{L('CARTOGRAPHER · 制图师工作台', 'CARTOGRAPHER WORKBENCH')}</div>
               <h2 className="font-display text-lg font-bold m-0 leading-tight" style={{ color: 'var(--brass-bright)' }}>
-                EXPLORER · 全维探索器
+                {L('EXPLORER · 全维探索器', 'DATA EXPLORER')}
               </h2>
             </div>
           </div>
@@ -666,7 +680,15 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
         </div>
 
         <p className="text-[11px] opacity-75 leading-relaxed m-0">
-          全美 <b>{scopedStates.length} 个州</b>、<b>{scopedCities.length} 座都会/微都会区</b> 与 <b>{scopedCountyRows.length.toLocaleString()} 个县</b> 的原始公开指标全部汇入同一张自由透视台：自定义列、多条件筛选、全量虚拟滚动明细、全量散点图框选联动地图，以及一键 CSV 导出。
+          {isEn ? (
+            <>
+              Explore all <b>{scopedStates.length} states</b>, <b>{scopedCities.length} metros/micros</b>, and <b>{scopedCountyRows.length.toLocaleString()} counties</b> in one interactive pivot workbench: custom columns, compound filters, full virtual-scrolled table, brushable scatter linked to the map, and one-click CSV export.
+            </>
+          ) : (
+            <>
+              全美 <b>{scopedStates.length} 个州</b>、<b>{scopedCities.length} 座都会/微都会区</b> 与 <b>{scopedCountyRows.length.toLocaleString()} 个县</b> 的原始公开指标全部汇入同一张自由透视台：自定义列、多条件筛选、全量虚拟滚动明细、全量散点图框选联动地图，以及一键 CSV 导出。
+            </>
+          )}
         </p>
 
         {/* 1. Level + Columns Picker + Custom Filter Builder */}
@@ -675,9 +697,9 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
             <Segmented
               value={level}
               options={[
-                { value: 'states', label: `州 (${scopedStates.length})` },
-                { value: 'metros', label: `都会区 (${scopedCities.length})` },
-                { value: 'counties', label: `县 (${scopedCountyRows.length.toLocaleString()})` },
+                { value: 'states', label: L(`州 (${scopedStates.length})`, `States (${scopedStates.length})`) },
+                { value: 'metros', label: L(`都会区 (${scopedCities.length})`, `Metros (${scopedCities.length})`) },
+                { value: 'counties', label: L(`县 (${scopedCountyRows.length.toLocaleString()})`, `Counties (${scopedCountyRows.length.toLocaleString()})`) },
               ]}
               onChange={(v) => {
                 const lv = v as LevelKey;
@@ -697,7 +719,7 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
                 colsOpen ? 'border-[var(--brass)] bg-[var(--brass-soft)]' : 'border-[var(--border-hairline)] hover:bg-white/10'
               }`}
             >
-              <Columns className="w-3 h-3" /> 列设置 ({activeCols.length})
+              <Columns className="w-3 h-3" /> {L(`列设置 (${activeCols.length})`, `Columns (${activeCols.length})`)}
             </button>
           </div>
 
@@ -726,7 +748,7 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
                             }}
                             className="accent-[var(--brass)]"
                           />
-                          {f.label}
+                          {fLabel(f)}
                         </label>
                       );
                     })}
@@ -748,7 +770,7 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
               className="flex-1 min-w-0 px-1.5 py-1 rounded-md border border-[var(--border-hairline)] bg-[var(--surface-paper-subtle)] text-[11px] outline-none"
             >
               {availableFields.map((f) => (
-                <option key={f.key} value={f.key}>{f.label}</option>
+                <option key={f.key} value={f.key}>{fLabel(f)}</option>
               ))}
             </select>
             <select
@@ -764,7 +786,7 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
               value={fVal}
               onChange={(e) => setFVal(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') addFilter(); }}
-              placeholder={fSpecSelected?.format === 'text' ? '如 CA' : '如 1M, 25%'}
+              placeholder={fSpecSelected?.format === 'text' ? L('如 CA', 'e.g. CA') : L('如 1M, 25%', 'e.g. 1M, 25%')}
               className="w-20 px-2 py-1 rounded-md border border-[var(--border-hairline)] bg-[var(--surface-paper-subtle)] text-[11px] outline-none"
             />
             <button
@@ -772,7 +794,7 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
               onClick={addFilter}
               className="px-2 py-1 rounded-md bg-[var(--brass)] text-[#141B24] font-bold text-[10.5px] flex items-center gap-0.5 cursor-pointer shrink-0"
             >
-              <Plus className="w-3 h-3" /> 添加
+              <Plus className="w-3 h-3" /> {L('添加', 'Add')}
             </button>
           </div>
 
@@ -780,15 +802,15 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
           <div className="flex flex-wrap items-center gap-1">
             {level === 'counties' ? (
               <button type="button" onClick={() => applyPreset('pop', '≥', 100000)} className="px-2 py-0.5 rounded-full bg-white/8 hover:bg-white/15 text-[10px] cursor-pointer">
-                10万+ 人口
+                {L('10万+ 人口', '100K+ Pop')}
               </button>
             ) : (
               <>
                 <button type="button" onClick={() => applyPreset('pop', '≥', 1000000)} className="px-2 py-0.5 rounded-full bg-white/8 hover:bg-white/15 text-[10px] cursor-pointer">
-                  100万+ 人口
+                  {L('100万+ 人口', '1M+ Pop')}
                 </button>
                 <button type="button" onClick={() => applyPreset('pop', '≥', 250000)} className="px-2 py-0.5 rounded-full bg-white/8 hover:bg-white/15 text-[10px] cursor-pointer">
-                  25万+
+                  {L('25万+', '250K+')}
                 </button>
               </>
             )}
@@ -796,34 +818,35 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
               const fd = FIELD_MAP.get(flt.key);
               return (
                 <span key={flt.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--brass-soft)] border border-[var(--brass)] text-[10px] font-semibold">
-                  {fd?.short ?? flt.key} {flt.op} {fd ? fmtCellVal(flt.value, fd.format) : String(flt.value)}
+                  {fd ? fShort(fd) : flt.key} {flt.op} {fd ? fmtCellVal(flt.value, fd.format) : String(flt.value)}
                   <button type="button" onClick={() => setFilters((p) => p.filter((x) => x.id !== flt.id))} className="cursor-pointer"><X className="w-2.5 h-2.5" /></button>
                 </span>
               );
             })}
             {filters.length > 1 && (
-              <button type="button" onClick={() => setFilters([])} className="text-[10px] underline opacity-70 cursor-pointer">清空筛选</button>
+              <button type="button" onClick={() => setFilters([])} className="text-[10px] underline opacity-70 cursor-pointer">{L('清空筛选', 'Clear filters')}</button>
             )}
           </div>
 
           <div className="text-[10.5px] font-mono-num opacity-75">
-            <b>{filteredRows.length.toLocaleString()}</b> / {allRows.length.toLocaleString()} {level === 'states' ? '个州' : level === 'metros' ? '个都会区' : '个县'} · <b>{fmtCount3(totalFilteredPop)}</b> 人
-            {brushedIds && brushedIds.size > 0 && <> · <b style={{ color: 'var(--brass-bright)' }}>已框选 {brushedIds.size} 项</b></>}
+            <b>{filteredRows.length.toLocaleString()}</b> / {allRows.length.toLocaleString()}{' '}
+            {level === 'states' ? L('个州', 'states') : level === 'metros' ? L('个都会区', 'metros') : L('个县', 'counties')} · <b>{fmtCount3(totalFilteredPop)}</b> {L('人', 'pop')}
+            {brushedIds && brushedIds.size > 0 && <> · <b style={{ color: 'var(--brass-bright)' }}>{L(`已框选 ${brushedIds.size} 项`, `${brushedIds.size} selected`)}</b></>}
           </div>
         </div>
 
         {/* 2. Dynamic Sortable Table */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="font-display text-xs font-bold m-0">数据表 · Table</h3>
+            <h3 className="font-display text-xs font-bold m-0">{L('数据表 · Table', 'Table')}</h3>
             {brushedIds && brushedIds.size > 0 && (
               <div className="flex items-center gap-2 text-[10.5px]">
                 <label className="inline-flex items-center gap-1 cursor-pointer">
                   <input type="checkbox" checked={onlySel} onChange={(e) => setOnlySel(e.target.checked)} className="accent-[var(--brass)]" />
-                  仅看框选
+                  {L('仅看框选', 'Selected only')}
                 </label>
                 <button type="button" onClick={() => { setBrushedIds(null); setOnlySel(false); setBrushed(null, null); }} className="underline cursor-pointer" style={{ color: 'var(--brass-bright)' }}>
-                  清除
+                  {L('清除', 'Clear')}
                 </button>
               </div>
             )}
@@ -835,10 +858,16 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder={`搜索${level === 'states' ? '州名' : level === 'metros' ? '都会区' : '县名/州'}...`}
+                placeholder={
+                  level === 'states'
+                    ? L('搜索州名...', 'Search states...')
+                    : level === 'metros'
+                      ? L('搜索都会区...', 'Search metros...')
+                      : L('搜索县名/州...', 'Search counties/state...')
+                }
                 className="w-full bg-transparent outline-none text-[11px] placeholder:opacity-50"
               />
-              <span className="text-[10px] font-mono-num opacity-65 shrink-0">共 {tableRows.length.toLocaleString()} 条</span>
+              <span className="text-[10px] font-mono-num opacity-65 shrink-0">{L(`共 ${tableRows.length.toLocaleString()} 条`, `${tableRows.length.toLocaleString()} rows`)}</span>
             </div>
             <div
               ref={tableRef}
@@ -850,7 +879,7 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
                 <thead className="sticky top-0 z-10 bg-[#131c28] border-b border-[var(--border-hairline)]">
                   <tr>
                     <th className="py-1.5 pl-2 pr-1 text-left opacity-45 font-mono-num w-8">#</th>
-                    <th className="py-1.5 px-1.5 text-left font-semibold opacity-75">名称</th>
+                    <th className="py-1.5 px-1.5 text-left font-semibold opacity-75">{L('名称', 'Name')}</th>
                     {activeCols.map((k) => {
                       const f = FIELD_MAP.get(k);
                       if (!f) return null;
@@ -864,7 +893,7 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
                           className={`py-1.5 px-1.5 font-semibold opacity-75 hover:opacity-100 cursor-pointer whitespace-nowrap ${f.format === 'text' ? 'text-left' : 'text-right'}`}
                         >
                           <span className="inline-flex items-center gap-0.5">
-                            {f.short}
+                            {fShort(f)}
                             {sortCol === k && (sortAsc ? <ArrowUp className="w-2.5 h-2.5" /> : <ArrowDown className="w-2.5 h-2.5" />)}
                           </span>
                         </th>
@@ -929,48 +958,48 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
 
         {/* 3. Interactive Chart Builder (X, Y, Size, Colour + logX/logY + Map Lens bridge!) */}
         <div className="pt-2 border-t border-[var(--border-hairline)] space-y-2">
-          <h3 className="font-display text-xs font-bold m-0">交互散点图 · Chart</h3>
+          <h3 className="font-display text-xs font-bold m-0">{L('交互散点图 · Chart', 'Interactive Scatter Chart')}</h3>
           <div className="grid grid-cols-2 gap-1.5">
             <div>
-              <label className="text-[9.5px] opacity-60 block mb-0.5">X 横轴</label>
+              <label className="text-[9.5px] opacity-60 block mb-0.5">{L('X 横轴', 'X Axis')}</label>
               <select
                 value={xy.x}
                 onChange={(e) => { setXyByLevel({ ...xyByLevel, [level]: { ...xy, x: e.target.value } }); setLogXOverride(null); }}
                 className="w-full px-1.5 py-1 rounded border border-[var(--border-hairline)] bg-[var(--surface-paper-subtle)] text-[11px]"
               >
-                {numericFields.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+                {numericFields.map((f) => <option key={f.key} value={f.key}>{fLabel(f)}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-[9.5px] opacity-60 block mb-0.5">Y 纵轴</label>
+              <label className="text-[9.5px] opacity-60 block mb-0.5">{L('Y 纵轴', 'Y Axis')}</label>
               <select
                 value={xy.y}
                 onChange={(e) => { setXyByLevel({ ...xyByLevel, [level]: { ...xy, y: e.target.value } }); setLogYOverride(null); }}
                 className="w-full px-1.5 py-1 rounded border border-[var(--border-hairline)] bg-[var(--surface-paper-subtle)] text-[11px]"
               >
-                {numericFields.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+                {numericFields.map((f) => <option key={f.key} value={f.key}>{fLabel(f)}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-[9.5px] opacity-60 block mb-0.5">气泡大小 (Size)</label>
+              <label className="text-[9.5px] opacity-60 block mb-0.5">{L('气泡大小 (Size)', 'Bubble Size')}</label>
               <select
                 value={xy.s}
                 onChange={(e) => setXyByLevel({ ...xyByLevel, [level]: { ...xy, s: e.target.value } })}
                 className="w-full px-1.5 py-1 rounded border border-[var(--border-hairline)] bg-[var(--surface-paper-subtle)] text-[11px]"
               >
-                <option value="">固定大小</option>
-                {numericFields.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+                <option value="">{L('固定大小', 'Fixed size')}</option>
+                {numericFields.map((f) => <option key={f.key} value={f.key}>{fLabel(f)}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-[9.5px] opacity-60 block mb-0.5">着色列 (Colour)</label>
+              <label className="text-[9.5px] opacity-60 block mb-0.5">{L('着色列 (Colour)', 'Color By')}</label>
               <select
                 value={xy.c}
                 onChange={(e) => setXyByLevel({ ...xyByLevel, [level]: { ...xy, c: e.target.value } })}
                 className="w-full px-1.5 py-1 rounded border border-[var(--border-hairline)] bg-[var(--surface-paper-subtle)] text-[11px]"
               >
-                <option value="">单色</option>
-                {availableFields.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+                <option value="">{L('单色', 'Single color')}</option>
+                {availableFields.map((f) => <option key={f.key} value={f.key}>{fLabel(f)}</option>)}
               </select>
             </div>
           </div>
@@ -978,18 +1007,18 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
           <div className="flex items-center gap-4 text-[10.5px]">
             <label className="inline-flex items-center gap-1 cursor-pointer">
               <input type="checkbox" checked={logX} onChange={(e) => setLogXOverride(e.target.checked)} className="accent-[var(--brass)]" />
-              对数横轴 (log X)
+              {L('对数横轴 (log X)', 'Log X axis')}
             </label>
             <label className="inline-flex items-center gap-1 cursor-pointer">
               <input type="checkbox" checked={logY} onChange={(e) => setLogYOverride(e.target.checked)} className="accent-[var(--brass)]" />
-              对数纵轴 (log Y)
+              {L('对数纵轴 (log Y)', 'Log Y axis')}
             </label>
           </div>
 
           <BrushScatter
             points={scatterPts}
-            xLabel={fx.label}
-            yLabel={fy.label}
+            xLabel={fLabel(fx)}
+            yLabel={fLabel(fy)}
             xFmt={fx.format === 'money' ? 'usd' : fx.format === 'signed' ? 'pct' : fx.format}
             yFmt={fy.format === 'money' ? 'usd' : fy.format === 'signed' ? 'pct' : fy.format}
             logX={logX}
@@ -1008,12 +1037,12 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
               if (!set) { setBrushed(null, null); return; }
               const hids = new Set<number>();
               for (const r of filteredRows) if (set.has(r.id)) for (const h of r.hexIds) hids.add(h);
-              setBrushed(hids, `探索器框选 ${set.size} 项`);
+              setBrushed(hids, L(`探索器框选 ${set.size} 项`, `Explorer brushed ${set.size} items`));
             }}
           />
 
           {colorLegend?.kind === 'num' && (
-            <RampLegend ramp={colorLegend.ramp} title={`着色：${colorLegend.title}`} minLabel={colorLegend.minLabel} maxLabel={colorLegend.maxLabel} />
+            <RampLegend ramp={colorLegend.ramp} title={L(`着色：${colorLegend.title}`, `Color: ${colorLegend.title}`)} minLabel={colorLegend.minLabel} maxLabel={colorLegend.maxLabel} />
           )}
           {colorLegend?.kind === 'cat' && <SwatchLegend items={colorLegend.items} />}
 
@@ -1032,7 +1061,7 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
                     }`}
                   >
                     <MapIcon className="w-3 h-3" />
-                    {on ? `正在显示「${f.short}」视角` : `地图着色：${f.short}`}
+                    {on ? L(`正在显示「${fShort(f)}」视角`, `Showing "${fShort(f)}" lens`) : L(`地图着色：${fShort(f)}`, `Map lens: ${fShort(f)}`)}
                   </button>
                 );
               })}
@@ -1042,18 +1071,26 @@ export const CountyExplorerPanel: React.FC<CountyExplorerPanelProps> = ({
           {/* Field Definitions Footer */}
           <div className="pt-2 border-t border-[var(--border-hairline)] space-y-1 text-[10px] opacity-65">
             {[fx, fy, fs, fc].filter((f, i, a): f is FieldSpec => !!f && a.indexOf(f) === i).map((f) => (
-              <div key={f.key}><b>{f.label}</b>：{f.desc}</div>
+              <div key={f.key}><b>{fLabel(f)}</b>{L('：', ': ')}{fDesc(f)}</div>
             ))}
           </div>
 
           <SourcesFooter
             sources={meta.sources}
             sourceIds={['acs_5yr', 'acs_1yr', 'census_pep', 'bea_cagdp2', 'bls_qcew', 'cdc_places', 'usrc_2020', 'fema_disasters', 'dod_mirta', 'dmdc_personnel', 'oldcc_defense', 'nlcd_2024']}
-            notes={[
-              '地理统计口径：默认聚焦美国本土 48 州 + 华盛顿特区（49 州、524 个都会/微都会区、3,109 个县），可随时切换「含 AK/HI」查看全美 51 州、530 个都会区与 3,144 个县。',
-              '全量虚拟滚动与散点绘制：明细表采用窗口虚拟滚动，完整呈现 1 至 3,109 名，不做 120 条截断；县级散点自动切换高 DPI Canvas2D 图层全量渲染全部 3,109 个县并支持拖拽框选联动地图。',
-              '缺失值处理遵循官方发布口径：CDC PLACES 未收录肯塔基州与宾夕法尼亚州；USRC 2020 未收录康涅狄格州新规划区县码，均诚实显示为 “–” 而不进行人工插值。',
-            ]}
+            notes={
+              isEn
+                ? [
+                    'Geographic scope: Defaults to Lower 48 + DC (49 states, 524 metros/micros, 3,109 counties); switch to "Incl. AK/HI" anytime for all 51 states, 530 metros, and 3,144 counties.',
+                    'Full virtual scrolling & Canvas2D scatter: The table renders all rows from rank 1 to 3,109+ without truncation; dense county scatters render on high-DPI Canvas2D with live map brushing.',
+                    'Missing values follow official publication coverage: CDC PLACES omits KY & PA; USRC 2020 omits Connecticut’s new planning regions — shown honestly as "–" with zero interpolation.',
+                  ]
+                : [
+                    '地理统计口径：默认聚焦美国本土 48 州 + 华盛顿特区（49 州、524 个都会/微都会区、3,109 个县），可随时切换「含 AK/HI」查看全美 51 州、530 个都会区与 3,144 个县。',
+                    '全量虚拟滚动与散点绘制：明细表采用窗口虚拟滚动，完整呈现 1 至 3,109 名，不做 120 条截断；县级散点自动切换高 DPI Canvas2D 图层全量渲染全部 3,109 个县并支持拖拽框选联动地图。',
+                    '缺失值处理遵循官方发布口径：CDC PLACES 未收录肯塔基州与宾夕法尼亚州；USRC 2020 未收录康涅狄格州新规划区县码，均诚实显示为 “–” 而不进行人工插值。',
+                  ]
+            }
           />
         </div>
       </div>

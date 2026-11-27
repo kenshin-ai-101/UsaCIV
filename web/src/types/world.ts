@@ -1,5 +1,7 @@
 export type ThemeMode = 'midnight' | 'daylight';
 
+export type Locale = 'zh' | 'en';
+
 export type MapMode = 'explore' | 'city' | 'state' | 'advisor' | 'explorer' | 'showdown';
 
 export interface InsetBox {

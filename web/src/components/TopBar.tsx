@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAppStore, type TopMetricId } from '../store/useAppStore';
+import { localizeWonderMetric, useL } from '../i18n';
 import { TopMetricPopover } from './TopMetricPopover';
 import type { CityRecord, MapLayersData, StateRecord, WorldHexData, WorldMeta } from '../types/world';
 
@@ -38,9 +39,11 @@ export const TopBar: React.FC<TopBarProps> = ({
   onExportPng,
   onCopyShareLink,
 }) => {
+  const { locale, L } = useL();
   const {
     theme,
     toggleTheme,
+    setLocale,
     mode,
     openCity,
     openState,
@@ -133,25 +136,52 @@ export const TopBar: React.FC<TopBarProps> = ({
 
     for (const s of states) {
       if (s.name.toLowerCase().includes(q) || s.abbr.toLowerCase() === q) {
-        out.push({ kind: 'state', id: s.fips, title: `${s.name} (${s.abbr})`, sub: `州 · ${(s.pop / 1e6).toFixed(2)}M 人 · GDP $${(s.gdp_musd / 1000).toFixed(0)}B`, x: s.x, y: s.y });
+        out.push({
+          kind: 'state',
+          id: s.fips,
+          title: `${s.name} (${s.abbr})`,
+          sub: L(
+            `州 · ${(s.pop / 1e6).toFixed(2)}M 人 · GDP $${(s.gdp_musd / 1000).toFixed(0)}B`,
+            `State · ${(s.pop / 1e6).toFixed(2)}M pop · GDP $${(s.gdp_musd / 1000).toFixed(0)}B`,
+          ),
+          x: s.x,
+          y: s.y,
+        });
       }
     }
     for (const c of cities) {
       if (c.name.toLowerCase().includes(q) || c.short_name.toLowerCase().includes(q)) {
-        out.push({ kind: 'city', id: c.id, title: c.short_name, sub: `${c.state_abbr} 都会区 · ${(c.pop / 1e6).toFixed(2)}M 人`, x: c.x, y: c.y });
+        out.push({
+          kind: 'city',
+          id: c.id,
+          title: c.short_name,
+          sub: L(
+            `${c.state_abbr} 都会区 · ${(c.pop / 1e6).toFixed(2)}M 人`,
+            `${c.state_abbr} Metro · ${(c.pop / 1e6).toFixed(2)}M pop`,
+          ),
+          x: c.x,
+          y: c.y,
+        });
       }
       if (out.length >= 14) break;
     }
     if (layersData && out.length < 14) {
       for (const w of layersData.wonders) {
         if (w.name.toLowerCase().includes(q)) {
-          out.push({ kind: 'wonder', id: w.id, title: w.name, sub: `奇观 #${w.rank} · ${w.metric_label}`, x: w.x, y: w.y });
+          out.push({
+            kind: 'wonder',
+            id: w.id,
+            title: w.name,
+            sub: `${L('奇观', 'Wonder')} #${w.rank} · ${localizeWonderMetric(w.metric_label, locale)}`,
+            x: w.x,
+            y: w.y,
+          });
         }
         if (out.length >= 16) break;
       }
     }
     return out.slice(0, 12);
-  }, [query, cities, states, layersData]);
+  }, [query, cities, states, layersData, locale]);
 
   const n = meta.nation;
   const advActive = mode === 'advisor' || mode === 'explorer';
@@ -169,7 +199,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       <button
         onClick={onResetView}
         className="flex items-center gap-2 shrink-0 cursor-pointer group whitespace-nowrap"
-        title="回到全美全景视图"
+        title={L('回到全美全景视图', 'Reset to full U.S. map view')}
       >
         <span
           className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border"
@@ -180,7 +210,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         <span className="font-display text-sm font-bold tracking-wider uppercase" style={{ color: 'var(--brass-bright)' }}>
           UNITED STATES
         </span>
-        <span className="text-[10.5px] opacity-60 hidden 2xl:inline">联邦六角志</span>
+        <span className="text-[10.5px] opacity-60 hidden 2xl:inline">{L('联邦六角志', 'TERRA AMERICANA')}</span>
       </button>
 
       {/* National Real Yields Ledger (Each metric independently clickable for detailed breakdown & map-linked ranking) */}
@@ -192,7 +222,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             iconClass: 'opacity-75 text-[11px]',
             val: `${(n.population / 1e6).toFixed(0)}M`,
             color: undefined,
-            title: '点击查看全美常住人口详情 (ACS 2025 B01003)',
+            title: L('点击查看全美常住人口详情 (ACS 2025 B01003)', 'Click for U.S. Resident Population breakdown (ACS 2025 B01003)'),
             displayClass: 'inline-flex',
           },
           {
@@ -201,7 +231,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             iconClass: 'text-[11px]',
             val: `${((n.real_yields?.food ?? 1728726) / 1e6).toFixed(1)}M`,
             color: 'var(--y-food)',
-            title: '点击查看粮食产出详情：农林渔牧从业人数 (ACS C24030)',
+            title: L('点击查看粮食产出详情：农林渔牧从业人数 (ACS C24030)', 'Click for Food Yield: Agriculture, Forestry & Fishing workers (ACS C24030)'),
             displayClass: 'inline-flex',
           },
           {
@@ -210,7 +240,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             iconClass: 'text-[11px]',
             val: `${((n.real_yields?.production ?? 27878245) / 1e6).toFixed(1)}M`,
             color: 'var(--y-prod)',
-            title: '点击查看生产力详情：制造、建筑与采矿从业人数 (ACS C24030)',
+            title: L('点击查看生产力详情：制造、建筑与采矿从业人数 (ACS C24030)', 'Click for Production Yield: Manufacturing, Construction & Mining workers (ACS C24030)'),
             displayClass: 'inline-flex',
           },
           {
@@ -219,7 +249,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             iconClass: 'text-[11px]',
             val: `$${(n.gdp_musd / 1e6).toFixed(1)}T`,
             color: 'var(--y-gold)',
-            title: '点击查看金币产出详情：BEA 2024 真实现价 GDP',
+            title: L('点击查看金币产出详情：BEA 2024 真实现价 GDP', 'Click for Gold Yield: BEA 2024 Current-Dollar GDP'),
             displayClass: 'inline-flex',
           },
           {
@@ -228,7 +258,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             iconClass: 'text-[11px]',
             val: `${((n.real_yields?.science ?? 17255272) / 1e6).toFixed(1)}M`,
             color: 'var(--y-science)',
-            title: '点击查看科研产出详情：专业科研与信息业从业人数 (ACS C24030)',
+            title: L('点击查看科研产出详情：专业科研与信息业从业人数 (ACS C24030)', 'Click for Science Yield: Scientific, Technical & Information workers (ACS C24030)'),
             displayClass: 'inline-flex',
           },
           {
@@ -237,7 +267,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             iconClass: 'text-[11px]',
             val: `${((n.real_yields?.culture ?? 3791558) / 1e6).toFixed(1)}M`,
             color: 'var(--y-culture)',
-            title: '点击查看文化产出详情：文化艺术与娱乐业从业人数 (ACS C24030)',
+            title: L('点击查看文化产出详情：文化艺术与娱乐业从业人数 (ACS C24030)', 'Click for Culture Yield: Arts, Entertainment & Recreation workers (ACS C24030)'),
             displayClass: 'inline-flex',
           },
           {
@@ -246,7 +276,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             iconClass: 'text-[11px]',
             val: `${((n.unemployment ?? 0.0488) * 100).toFixed(1)}%`,
             color: undefined,
-            title: '点击查看全美平民失业率详情 (ACS 2025 B23025)',
+            title: L('点击查看全美平民失业率详情 (ACS 2025 B23025)', 'Click for U.S. Civilian Unemployment Rate breakdown (ACS 2025 B23025)'),
             displayClass: 'hidden xl:inline-flex',
           },
         ]).map((item) => {
@@ -307,7 +337,10 @@ export const TopBar: React.FC<TopBarProps> = ({
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setTimeout(() => setSearchFocused(false), 180)}
-            placeholder={`搜索 ${geoScope === 'conus' ? (n.conus_metros ?? 524) : cities.length} 城、${geoScope === 'conus' ? 49 : states.length} 州、${n.total_wonders} 奇观...`}
+            placeholder={L(
+              `搜索 ${geoScope === 'conus' ? (n.conus_metros ?? 524) : cities.length} 城、${geoScope === 'conus' ? 49 : states.length} 州、${n.total_wonders} 奇观...`,
+              `Search ${geoScope === 'conus' ? (n.conus_metros ?? 524) : cities.length} metros, ${geoScope === 'conus' ? 49 : states.length} states, ${n.total_wonders} wonders...`,
+            )}
             className="w-full bg-transparent outline-none text-xs placeholder:opacity-55"
           />
           {query ? (
@@ -337,7 +370,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                   <div className="text-[10px] opacity-65 truncate">{item.sub}</div>
                 </div>
                 <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-[var(--brass-soft)] font-semibold shrink-0" style={{ color: 'var(--brass)' }}>
-                  {item.kind === 'city' ? '都会区' : item.kind === 'state' ? '州' : '奇观'}
+                  {item.kind === 'city' ? L('都会区', 'Metro') : item.kind === 'state' ? L('州', 'State') : L('奇观', 'Wonder')}
                 </span>
               </button>
             ))}
@@ -351,27 +384,61 @@ export const TopBar: React.FC<TopBarProps> = ({
           onClick={() => (advActive ? closeSidePanel() : openAdvisor('council'))}
           className={`dock-btn !py-1 !px-2.5 ${advActive ? 'active' : ''}`}
           style={{ borderColor: advActive ? 'var(--brass)' : 'var(--border-hairline)' }}
-          title="打开 9 位内阁顾问与全美探索器 (Council & Explorer)"
+          title={L('打开 9 位内阁顾问与全美探索器 (Council & Explorer)', 'Open 9 Cabinet Advisors & Explorer')}
         >
           <Landmark className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--brass-bright)' }} />
-          <span className="hidden sm:inline">顾问团</span>
+          <span className="hidden sm:inline">{L('顾问团', 'Advisors')}</span>
         </button>
 
         <button
           onClick={() => (mode === 'showdown' ? closeSidePanel() : openShowdown('city'))}
           className={`dock-btn !py-1 !px-2.5 ${mode === 'showdown' ? 'active' : ''}`}
           style={{ borderColor: mode === 'showdown' ? 'var(--brass)' : 'var(--border-hairline)' }}
-          title="双城 / 双州国力 PK 对决"
+          title={L('双城 / 双州国力 PK 对决', 'City vs. City / State vs. State Showdown')}
         >
           <Scale className="w-3.5 h-3.5 shrink-0" />
-          <span className="hidden md:inline">国力 PK</span>
+          <span className="hidden md:inline">{L('国力 PK', 'Showdown')}</span>
         </button>
+
+        {/* Bilingual Locale Switcher (中文 / EN) */}
+        <div
+          role="group"
+          aria-label={L('切换语言', 'Switch language')}
+          className="inline-flex items-center rounded-md border p-0.5 text-[10.5px] font-bold"
+          style={{ borderColor: 'var(--border-hairline)', background: 'var(--surface-paper-subtle)' }}
+          title={L('切换界面语言（中文 / English）', 'Switch UI language (中文 / English)')}
+        >
+          <button
+            type="button"
+            onClick={() => setLocale('zh')}
+            aria-pressed={locale === 'zh'}
+            className={`px-1.5 py-0.5 rounded-[4px] leading-none transition cursor-pointer ${
+              locale === 'zh' ? 'bg-[var(--brass)] text-[#141B24]' : 'opacity-65 hover:opacity-100'
+            }`}
+          >
+            中
+          </button>
+          <button
+            type="button"
+            onClick={() => setLocale('en')}
+            aria-pressed={locale === 'en'}
+            className={`px-1.5 py-0.5 rounded-[4px] leading-none transition cursor-pointer ${
+              locale === 'en' ? 'bg-[var(--brass)] text-[#141B24]' : 'opacity-65 hover:opacity-100'
+            }`}
+          >
+            EN
+          </button>
+        </div>
 
         <button
           onClick={toggleTheme}
           className="dock-btn !p-1.5"
           style={{ borderColor: 'var(--border-hairline)' }}
-          title={theme === 'midnight' ? '切换为 WPA 日光羊皮纸主题' : '切换为经典暗夜制图主题 (T)'}
+          title={
+            theme === 'midnight'
+              ? L('切换为 WPA 日光羊皮纸主题 (T)', 'Switch to WPA Daylight Atlas theme (T)')
+              : L('切换为经典暗夜制图主题 (T)', 'Switch to Midnight Cartography theme (T)')
+          }
         >
           {theme === 'midnight' ? <Sun className="w-3.5 h-3.5 text-amber-300" /> : <Moon className="w-3.5 h-3.5" />}
         </button>
@@ -380,17 +447,17 @@ export const TopBar: React.FC<TopBarProps> = ({
           onClick={onCopyShareLink}
           className="dock-btn !py-1 !px-2 hidden sm:inline-flex"
           style={{ borderColor: 'var(--border-hairline)' }}
-          title="复制当前视图分享链接"
+          title={L('复制当前视图分享链接', 'Copy shareable link to current view')}
         >
           <Share2 className="w-3.5 h-3.5" />
-          <span className="hidden xl:inline">分享</span>
+          <span className="hidden xl:inline">{L('分享', 'Share')}</span>
         </button>
 
         <button
           onClick={onExportPng}
           className="dock-btn !p-1.5 hidden md:inline-flex"
           style={{ borderColor: 'var(--border-hairline)' }}
-          title="导出高清 PNG 地图海报"
+          title={L('导出高清 PNG 地图海报', 'Export HD PNG map snapshot')}
         >
           <CameraIcon className="w-3.5 h-3.5" />
         </button>
@@ -399,7 +466,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           onClick={() => setHelpOpen(true)}
           className="dock-btn !p-1.5"
           style={{ borderColor: 'var(--border-hairline)' }}
-          title="快捷键与操作帮助"
+          title={L('快捷键与操作帮助', 'Keyboard shortcuts & controls')}
         >
           <HelpCircle className="w-3.5 h-3.5" />
         </button>
@@ -408,10 +475,10 @@ export const TopBar: React.FC<TopBarProps> = ({
           onClick={() => setAlmanacOpen(true, 'sources')}
           className="dock-btn !py-1 !px-2.5"
           style={{ borderColor: 'var(--brass)', background: 'var(--brass-soft)', color: 'var(--brass-bright)' }}
-          title="打开《联邦百科全书》与全部 31 项公开数据源链接 (?)"
+          title={L('打开《联邦百科全书》与全部 31 项公开数据源链接 (?)', 'Open Federal Almanac & all 31 official data sources (?)')}
         >
           <BookOpen className="w-3.5 h-3.5 shrink-0" />
-          <span className="hidden sm:inline">百科</span>
+          <span className="hidden sm:inline">{L('百科', 'Almanac')}</span>
         </button>
       </div>
     </header>

@@ -3,6 +3,7 @@ import { Crown, Scale, X } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { formatMetric } from '../lenses/lensConfig';
 import { MeepleCohortSvg } from '../city/CityCommandPanel';
+import { localizeDistrictName, useL } from '../../i18n';
 import type { CityRecord, StateRecord, YieldSet } from '../../types/world';
 
 interface ShowdownPanelProps {
@@ -10,28 +11,29 @@ interface ShowdownPanelProps {
   states: StateRecord[];
 }
 
-const CITY_PRESETS: { label: string; aMatch: string; bMatch: string }[] = [
-  { label: '硅谷 vs 汽车城', aMatch: 'San Jose', bMatch: 'Detroit' },
-  { label: '纽约 vs 旧金山', aMatch: 'New York', bMatch: 'San Francisco' },
-  { label: '休斯顿 vs 西雅图', aMatch: 'Houston', bMatch: 'Seattle' },
-  { label: '安克雷奇 vs 檀香山', aMatch: 'Anchorage', bMatch: 'Honolulu' },
+const CITY_PRESETS: { label: string; labelEn: string; aMatch: string; bMatch: string }[] = [
+  { label: '硅谷 vs 汽车城', labelEn: 'Silicon Valley vs Detroit', aMatch: 'San Jose', bMatch: 'Detroit' },
+  { label: '纽约 vs 旧金山', labelEn: 'New York vs San Francisco', aMatch: 'New York', bMatch: 'San Francisco' },
+  { label: '休斯顿 vs 西雅图', labelEn: 'Houston vs Seattle', aMatch: 'Houston', bMatch: 'Seattle' },
+  { label: '安克雷奇 vs 檀香山', labelEn: 'Anchorage vs Honolulu', aMatch: 'Anchorage', bMatch: 'Honolulu' },
 ];
 
-const STATE_PRESETS: { label: string; aFips: string; bFips: string }[] = [
-  { label: '加州 vs 德州', aFips: '06', bFips: '48' },
-  { label: '纽约 vs 佛州', aFips: '36', bFips: '12' },
-  { label: '麻省 vs 密歇根', aFips: '25', bFips: '26' },
-  { label: '阿拉斯加 vs 夏威夷', aFips: '02', bFips: '15' },
+const STATE_PRESETS: { label: string; labelEn: string; aFips: string; bFips: string }[] = [
+  { label: '加州 vs 德州', labelEn: 'California vs Texas', aFips: '06', bFips: '48' },
+  { label: '纽约 vs 佛州', labelEn: 'New York vs Florida', aFips: '36', bFips: '12' },
+  { label: '麻省 vs 密歇根', labelEn: 'Massachusetts vs Michigan', aFips: '25', bFips: '26' },
+  { label: '阿拉斯加 vs 夏威夷', labelEn: 'Alaska vs Hawaii', aFips: '02', bFips: '15' },
 ];
 
 const SixYieldRadar: React.FC<{ a: YieldSet; b: YieldSet; nameA: string; nameB: string }> = ({ a, b, nameA, nameB }) => {
+  const { L } = useL();
   const keys: { k: keyof YieldSet; lbl: string }[] = [
-    { k: 'gold', lbl: '金币 GDP' },
-    { k: 'sci', lbl: '科技' },
-    { k: 'prod', lbl: '产能' },
-    { k: 'food', lbl: '粮食' },
-    { k: 'cul', lbl: '文化' },
-    { k: 'faith', lbl: '信仰' },
+    { k: 'gold', lbl: L('金币 GDP', 'Gold GDP') },
+    { k: 'sci', lbl: L('科技', 'Science') },
+    { k: 'prod', lbl: L('产能', 'Prod') },
+    { k: 'food', lbl: L('粮食', 'Food') },
+    { k: 'cul', lbl: L('文化', 'Culture') },
+    { k: 'faith', lbl: L('信仰', 'Faith') },
   ];
   const cx = 110, cy = 96, R = 68;
   const maxes = keys.map(({ k }) => Math.max(10, a[k], b[k]) * 1.12);
@@ -87,6 +89,7 @@ const SixYieldRadar: React.FC<{ a: YieldSet; b: YieldSet; nameA: string; nameB: 
 };
 
 export const ShowdownPanel: React.FC<ShowdownPanelProps> = ({ cities, states }) => {
+  const { locale, isEn, L } = useL();
   const { showdownKind, showdownA, showdownB, setShowdownPair, closeSidePanel } = useAppStore();
 
   const sj = useMemo(() => cities.find((c) => c.short_name === 'San Jose') ?? cities[0], [cities]);
@@ -121,11 +124,11 @@ export const ShowdownPanel: React.FC<ShowdownPanelProps> = ({ cities, states }) 
       <div className="space-y-1">
         <div className="flex justify-between items-center text-[11px]">
           <span className={`font-mono-num flex items-center gap-1 ${aWins ? 'font-bold text-[#29669C]' : 'opacity-75'}`}>
-            {aWins && <Crown className="w-3 h-3" />} {formatMetric(va, fmt)}
+            {aWins && <Crown className="w-3 h-3" />} {formatMetric(va, fmt, locale)}
           </span>
           <span className="text-[10.5px] opacity-65 font-medium">{label}</span>
           <span className={`font-mono-num flex items-center gap-1 ${bWins ? 'font-bold text-[#B85636]' : 'opacity-75'}`}>
-            {formatMetric(vb, fmt)} {bWins && <Crown className="w-3 h-3" />}
+            {formatMetric(vb, fmt, locale)} {bWins && <Crown className="w-3 h-3" />}
           </span>
         </div>
         <div className="grid grid-cols-2 gap-1 h-1.5">
@@ -146,7 +149,7 @@ export const ShowdownPanel: React.FC<ShowdownPanelProps> = ({ cities, states }) 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Scale className="w-4 h-4" style={{ color: 'var(--brass)' }} />
-            <h2 className="font-display text-base font-bold m-0">双城 / 双州国力 PK 对决</h2>
+            <h2 className="font-display text-base font-bold m-0">{L('双城 / 双州国力 PK 对决', 'Metro / State Showdown')}</h2>
           </div>
           <button onClick={closeSidePanel} className="p-1 rounded-lg hover:bg-[var(--surface-paper-hover)] cursor-pointer">
             <X className="w-4 h-4" />
@@ -161,7 +164,7 @@ export const ShowdownPanel: React.FC<ShowdownPanelProps> = ({ cities, states }) 
             }`}
             style={showdownKind === 'city' ? { background: 'var(--brass)' } : undefined}
           >
-            都会区对决 (524 城)
+            {L(`都会区对决 (${cities.length} 城)`, `Metros (${cities.length})`)}
           </button>
           <button
             onClick={() => setShowdownPair('state', '06', '48')}
@@ -170,7 +173,7 @@ export const ShowdownPanel: React.FC<ShowdownPanelProps> = ({ cities, states }) 
             }`}
             style={showdownKind === 'state' ? { background: 'var(--brass)' } : undefined}
           >
-            联邦州对决 (51 州)
+            {L(`联邦州对决 (${states.length} 州)`, `States (${states.length})`)}
           </button>
         </div>
       </div>
@@ -189,7 +192,7 @@ export const ShowdownPanel: React.FC<ShowdownPanelProps> = ({ cities, states }) 
                   }}
                   className="px-2 py-1 rounded-lg text-[10.5px] font-semibold bg-[var(--surface-paper-subtle)] hover:bg-[var(--brass-soft)] cursor-pointer"
                 >
-                  {pr.label}
+                  {isEn ? pr.labelEn : pr.label}
                 </button>
               ))
             : STATE_PRESETS.map((pr) => (
@@ -198,7 +201,7 @@ export const ShowdownPanel: React.FC<ShowdownPanelProps> = ({ cities, states }) 
                   onClick={() => setShowdownPair('state', pr.aFips, pr.bFips)}
                   className="px-2 py-1 rounded-lg text-[10.5px] font-semibold bg-[var(--surface-paper-subtle)] hover:bg-[var(--brass-soft)] cursor-pointer"
                 >
-                  {pr.label}
+                  {isEn ? pr.labelEn : pr.label}
                 </button>
               ))}
         </div>
@@ -230,33 +233,37 @@ export const ShowdownPanel: React.FC<ShowdownPanelProps> = ({ cities, states }) 
             <SixYieldRadar a={cityA.yields} b={cityB.yields} nameA={cityA.short_name} nameB={cityB.short_name} />
 
             <div className="space-y-2.5 pt-2 border-t border-[var(--border-hairline)]">
-              <CompareRow label="真实 GDP" va={cityA.gdp_musd} vb={cityB.gdp_musd} fmt="usd_m" />
-              <CompareRow label="人均 GDP" va={cityA.gdp_per_cap} vb={cityB.gdp_per_cap} fmt="usd" />
-              <CompareRow label="常住人口" va={cityA.pop} vb={cityB.pop} fmt="int" />
-              <CompareRow label="家庭中位收入" va={cityA.median_income} vb={cityB.median_income} fmt="usd" />
-              <CompareRow label="房价中位数" va={cityA.median_home} vb={cityB.median_home} fmt="usd" />
-              <CompareRow label="本科及以上学历" va={cityA.bachelors_pct} vb={cityB.bachelors_pct} fmt="pct" />
-              <CompareRow label="STEM 科技劳动力占比" va={cityA.workforce.stem_share} vb={cityB.workforce.stem_share} fmt="pct" />
-              <CompareRow label="健康宜居度" va={cityA.amenities} vb={cityB.amenities} fmt="index" />
-              <CompareRow label="平均单程通勤 (越短越优)" va={cityA.commute_min} vb={cityB.commute_min} fmt="min" lowerWins />
+              <CompareRow label={L('真实 GDP', 'Real GDP')} va={cityA.gdp_musd} vb={cityB.gdp_musd} fmt="usd_m" />
+              <CompareRow label={L('人均 GDP', 'GDP per Capita')} va={cityA.gdp_per_cap} vb={cityB.gdp_per_cap} fmt="usd" />
+              <CompareRow label={L('常住人口', 'Population')} va={cityA.pop} vb={cityB.pop} fmt="int" />
+              <CompareRow label={L('家庭中位收入', 'Median Income')} va={cityA.median_income} vb={cityB.median_income} fmt="usd" />
+              <CompareRow label={L('房价中位数', 'Median Home Value')} va={cityA.median_home} vb={cityB.median_home} fmt="usd" />
+              <CompareRow label={L('本科及以上学历', 'Bachelor’s+ Degree')} va={cityA.bachelors_pct} vb={cityB.bachelors_pct} fmt="pct" />
+              <CompareRow label={L('STEM 科技劳动力占比', 'STEM Workforce Share')} va={cityA.workforce.stem_share} vb={cityB.workforce.stem_share} fmt="pct" />
+              <CompareRow label={L('健康宜居度', 'Wellbeing Index')} va={cityA.amenities} vb={cityB.amenities} fmt="index" />
+              <CompareRow label={L('平均单程通勤 (越短越优)', 'Mean Commute (lower wins)')} va={cityA.commute_min} vb={cityB.commute_min} fmt="min" lowerWins />
             </div>
 
             <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-[var(--border-hairline)]">
               <div className="p-2.5 rounded-xl bg-[var(--surface-paper-subtle)]/55">
-                <div className="font-bold text-[11px] mb-1.5 text-[#29669C]">{cityA.short_name} · 16 市民</div>
+                <div className="font-bold text-[11px] mb-1.5 text-[#29669C]">{cityA.short_name} · {L('16 市民', '16 Citizens')}</div>
                 <MeepleCohortSvg groups={cityA.workforce.groups} compact />
                 <div className="mt-2 flex flex-wrap gap-1">
                   {cityA.districts.slice(0, 3).map((d) => (
-                    <span key={d.id} className="text-[9.5px] px-1.5 py-0.5 rounded bg-[var(--surface-paper)] border border-[var(--border-hairline)]">{d.name}</span>
+                    <span key={d.id} className="text-[9.5px] px-1.5 py-0.5 rounded bg-[var(--surface-paper)] border border-[var(--border-hairline)]">
+                      {localizeDistrictName(d.id, d.name, locale)}
+                    </span>
                   ))}
                 </div>
               </div>
               <div className="p-2.5 rounded-xl bg-[var(--surface-paper-subtle)]/55">
-                <div className="font-bold text-[11px] mb-1.5 text-[#B85636]">{cityB.short_name} · 16 市民</div>
+                <div className="font-bold text-[11px] mb-1.5 text-[#B85636]">{cityB.short_name} · {L('16 市民', '16 Citizens')}</div>
                 <MeepleCohortSvg groups={cityB.workforce.groups} compact />
                 <div className="mt-2 flex flex-wrap gap-1">
                   {cityB.districts.slice(0, 3).map((d) => (
-                    <span key={d.id} className="text-[9.5px] px-1.5 py-0.5 rounded bg-[var(--surface-paper)] border border-[var(--border-hairline)]">{d.name}</span>
+                    <span key={d.id} className="text-[9.5px] px-1.5 py-0.5 rounded bg-[var(--surface-paper)] border border-[var(--border-hairline)]">
+                      {localizeDistrictName(d.id, d.name, locale)}
+                    </span>
                   ))}
                 </div>
               </div>
@@ -290,15 +297,15 @@ export const ShowdownPanel: React.FC<ShowdownPanelProps> = ({ cities, states }) 
             <SixYieldRadar a={stateA.yields} b={stateB.yields} nameA={stateA.abbr} nameB={stateB.abbr} />
 
             <div className="space-y-2.5 pt-2 border-t border-[var(--border-hairline)]">
-              <CompareRow label="州真实 GDP" va={stateA.gdp_musd} vb={stateB.gdp_musd} fmt="usd_m" />
-              <CompareRow label="人均 GDP" va={stateA.gdp_per_cap} vb={stateB.gdp_per_cap} fmt="usd" />
-              <CompareRow label="常住总人口" va={stateA.pop} vb={stateB.pop} fmt="int" />
-              <CompareRow label="人口增速 (2020-25)" va={stateA.pop_growth_pct} vb={stateB.pop_growth_pct} fmt="pct" />
-              <CompareRow label="家庭中位收入" va={stateA.median_income} vb={stateB.median_income} fmt="usd" />
-              <CompareRow label="本科学历占比" va={stateA.bachelors_pct} vb={stateB.bachelors_pct} fmt="pct" />
-              <CompareRow label="健康宜居指数" va={stateA.amenities} vb={stateB.amenities} fmt="index" />
-              <CompareRow label="国防支出 (OLDCC)" va={stateA.defense_spending_musd} vb={stateB.defense_spending_musd} fmt="usd_m" />
-              <CompareRow label="现役驻军人数 (DMDC)" va={stateA.military_active} vb={stateB.military_active} fmt="int" />
+              <CompareRow label={L('州真实 GDP', 'State Real GDP')} va={stateA.gdp_musd} vb={stateB.gdp_musd} fmt="usd_m" />
+              <CompareRow label={L('人均 GDP', 'GDP per Capita')} va={stateA.gdp_per_cap} vb={stateB.gdp_per_cap} fmt="usd" />
+              <CompareRow label={L('常住总人口', 'Population')} va={stateA.pop} vb={stateB.pop} fmt="int" />
+              <CompareRow label={L('人口增速 (2020-25)', 'Pop Growth (2020-25)')} va={stateA.pop_growth_pct} vb={stateB.pop_growth_pct} fmt="pct" />
+              <CompareRow label={L('家庭中位收入', 'Median Income')} va={stateA.median_income} vb={stateB.median_income} fmt="usd" />
+              <CompareRow label={L('本科学历占比', 'Bachelor’s+ Share')} va={stateA.bachelors_pct} vb={stateB.bachelors_pct} fmt="pct" />
+              <CompareRow label={L('健康宜居指数', 'Wellbeing Index')} va={stateA.amenities} vb={stateB.amenities} fmt="index" />
+              <CompareRow label={L('国防支出 (OLDCC)', 'Defense Spend (OLDCC)')} va={stateA.defense_spending_musd} vb={stateB.defense_spending_musd} fmt="usd_m" />
+              <CompareRow label={L('现役驻军人数 (DMDC)', 'Active-Duty Troops (DMDC)')} va={stateA.military_active} vb={stateB.military_active} fmt="int" />
             </div>
           </>
         )}

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, BookOpen, Eye, Trophy, X } from 'lucide-react';
 import { useAppStore, type TopMetricId } from '../store/useAppStore';
 import { fmtCount3, fmtMoney3, fmtMw, fmtSignedPct } from '../features/advisors/AdvisorCharts';
+import { localizeIndustry, useL } from '../i18n';
 import type { CityRecord, StateRecord, WorldMeta } from '../types/world';
 
 interface TopMetricPopoverProps {
@@ -19,9 +20,11 @@ interface MetricPillDef {
   id: TopMetricId;
   icon: string;
   shortLabel: string;
+  shortLabelEn: string;
   title: string;
   titleEn: string;
   sourceTag: string;
+  sourceTagEn: string;
   accent: string;
   barColor: string;
 }
@@ -41,9 +44,11 @@ const METRIC_META: Record<TopMetricId, MetricPillDef> = {
     id: 'population',
     icon: '👥',
     shortLabel: '人口',
+    shortLabelEn: 'Pop',
     title: '全美常住人口',
     titleEn: 'U.S. Resident Population',
     sourceTag: 'ACS 2025 1-Yr · B01003',
+    sourceTagEn: 'ACS 2025 1-Yr · B01003',
     accent: 'var(--brass-bright)',
     barColor: '#c9a455',
   },
@@ -51,9 +56,11 @@ const METRIC_META: Record<TopMetricId, MetricPillDef> = {
     id: 'food',
     icon: '🌾',
     shortLabel: '粮食',
+    shortLabelEn: 'Food',
     title: '粮食产出 · 农林渔牧就业',
     titleEn: 'Food Yield · Agriculture & Forestry',
     sourceTag: 'ACS 2025 1-Yr · C24030',
+    sourceTagEn: 'ACS 2025 1-Yr · C24030',
     accent: 'var(--y-food)',
     barColor: '#7fbf3f',
   },
@@ -61,9 +68,11 @@ const METRIC_META: Record<TopMetricId, MetricPillDef> = {
     id: 'production',
     icon: '⚙',
     shortLabel: '产能',
+    shortLabelEn: 'Prod',
     title: '生产力 · 工业与建造就业',
     titleEn: 'Production Yield · Mfg / Constr / Mining',
     sourceTag: 'ACS 2025 1-Yr · C24030',
+    sourceTagEn: 'ACS 2025 1-Yr · C24030',
     accent: 'var(--y-prod)',
     barColor: '#d9823b',
   },
@@ -71,9 +80,11 @@ const METRIC_META: Record<TopMetricId, MetricPillDef> = {
     id: 'gold',
     icon: '●',
     shortLabel: 'GDP',
+    shortLabelEn: 'GDP',
     title: '金币产出 · 全美真实 GDP',
     titleEn: 'Gold Yield · Current-Dollar GDP',
     sourceTag: 'BEA CAGDP2 · 2024 现价',
+    sourceTagEn: 'BEA CAGDP2 · 2024 Current $',
     accent: 'var(--y-gold)',
     barColor: '#f2c94c',
   },
@@ -81,9 +92,11 @@ const METRIC_META: Record<TopMetricId, MetricPillDef> = {
     id: 'science',
     icon: '⚗',
     shortLabel: '科研',
+    shortLabelEn: 'Sci',
     title: '科研产出 · 专业科研与信息业',
     titleEn: 'Science Yield · Scientific & Info',
     sourceTag: 'ACS 2025 1-Yr · C24030',
+    sourceTagEn: 'ACS 2025 1-Yr · C24030',
     accent: 'var(--y-science)',
     barColor: '#4fa3e0',
   },
@@ -91,9 +104,11 @@ const METRIC_META: Record<TopMetricId, MetricPillDef> = {
     id: 'culture',
     icon: '🎭',
     shortLabel: '文化',
+    shortLabelEn: 'Cul',
     title: '文化产出 · 文化艺术与娱乐业',
     titleEn: 'Culture Yield · Arts & Recreation',
     sourceTag: 'ACS 2025 1-Yr · C24030',
+    sourceTagEn: 'ACS 2025 1-Yr · C24030',
     accent: 'var(--y-culture)',
     barColor: '#b07ce0',
   },
@@ -101,19 +116,21 @@ const METRIC_META: Record<TopMetricId, MetricPillDef> = {
     id: 'unemployment',
     icon: '💼',
     shortLabel: '失业率',
+    shortLabelEn: 'Unemp',
     title: '全美平民失业率',
     titleEn: 'Civilian Labor Force Unemployment',
     sourceTag: 'ACS 2025 1-Yr · B23025',
+    sourceTagEn: 'ACS 2025 1-Yr · B23025',
     accent: 'var(--brass-bright)',
     barColor: '#e0824a',
   },
 };
 
-const REGION_STYLE: Record<string, { label: string; color: string }> = {
-  South: { label: '南部 South', color: '#d98a3b' },
-  West: { label: '西部 West', color: '#4fa3e0' },
-  Midwest: { label: '中西部 Midwest', color: '#7fbf3f' },
-  Northeast: { label: '东北部 Northeast', color: '#b07ce0' },
+const REGION_STYLE: Record<string, { label: string; labelEn: string; color: string }> = {
+  South: { label: '南部 South', labelEn: 'South', color: '#d98a3b' },
+  West: { label: '西部 West', labelEn: 'West', color: '#4fa3e0' },
+  Midwest: { label: '中西部 Midwest', labelEn: 'Midwest', color: '#7fbf3f' },
+  Northeast: { label: '东北部 Northeast', labelEn: 'Northeast', color: '#b07ce0' },
 };
 
 const GDP_SECTOR_COLORS = ['#f2c94c', '#5eb2f5', '#eb9348', '#8c9fe8', '#58c998', '#7f8d9c'];
@@ -179,6 +196,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
   onClose,
   onSelectMetric,
 }) => {
+  const { locale, isEn, L } = useL();
   const {
     theme,
     openCity,
@@ -305,7 +323,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
         .sort((a, b) => b[1] - a[1])
         .map(([reg, val]) => ({
           key: reg,
-          label: REGION_STYLE[reg]?.label ?? reg,
+          label: isEn ? (REGION_STYLE[reg]?.labelEn ?? reg) : (REGION_STYLE[reg]?.label ?? reg),
           value: val,
           valueText: formatter(val),
           subText: `${((val / total) * 100).toFixed(1)}%`,
@@ -318,9 +336,9 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
       const metroShare = (totals.citiesPop / n.population) * 100;
       const empRatio = (usEmp / n.population) * 100;
       const kpis = [
-        { label: '2021–25 增速', value: fmtSignedPct(n.growth ?? 0.0292, 2), sub: 'Census PEP 估算', color: goodCol },
-        { label: '16岁+ 就业人口', value: fmtCount3(usEmp), sub: `占总人口 ${empRatio.toFixed(1)}%` },
-        { label: '都会区集中度', value: `${metroShare.toFixed(1)}%`, sub: `${cities.length} 城 · ${n.total_counties.toLocaleString()} 县` },
+        { label: L('2021–25 增速', '2021–25 Growth'), value: fmtSignedPct(n.growth ?? 0.0292, 2), sub: L('Census PEP 估算', 'Census PEP est.'), color: goodCol },
+        { label: L('16岁+ 就业人口', 'Employed (16+)'), value: fmtCount3(usEmp), sub: L(`占总人口 ${empRatio.toFixed(1)}%`, `${empRatio.toFixed(1)}% of total pop`) },
+        { label: L('都会区集中度', 'Metro Share'), value: `${metroShare.toFixed(1)}%`, sub: L(`${cities.length} 城 · ${n.total_counties.toLocaleString()} 县`, `${cities.length} metros · ${n.total_counties.toLocaleString()} counties`) },
       ];
       const segments = buildRegionSegments((s) => s.pop, (v) => fmtCount3(v));
 
@@ -336,7 +354,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
               kind: 'state',
               label: s.name,
               sublabel: s.abbr,
-              detail: `占全美 ${((s.pop / n.population) * 100).toFixed(1)}%`,
+              detail: L(`占全美 ${((s.pop / n.population) * 100).toFixed(1)}%`, `${((s.pop / n.population) * 100).toFixed(1)}% of U.S.`),
               value: s.pop,
               valueText: fmtCount3(s.pop),
               hexIds: stateHexMap.get(s.fips) ?? [],
@@ -369,13 +387,13 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
               kind: 'city',
               label: c.short_name,
               sublabel: c.state_abbr,
-              detail: `占全美 ${((c.pop / n.population) * 100).toFixed(1)}%`,
+              detail: L(`占全美 ${((c.pop / n.population) * 100).toFixed(1)}%`, `${((c.pop / n.population) * 100).toFixed(1)}% of U.S.`),
               value: c.pop,
               valueText: fmtCount3(c.pop),
               hexIds: c.hex_ids,
             }));
         } else {
-          rankHint = '仅计 25 万+ 人口都会区（PEP 2021–2025 净增长率）';
+          rankHint = L('仅计 25 万+ 人口都会区（PEP 2021–2025 净增长率）', 'Metros with 250K+ population only (PEP 2021–2025 net growth)');
           rows = [...cities]
             .filter((c) => c.pop >= 250000 && c.pop_growth_pct != null)
             .sort((a, b) => (b.pop_growth_pct ?? -9) - (a.pop_growth_pct ?? -9))
@@ -397,20 +415,23 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
 
       return {
         heroValue: n.population.toLocaleString('en-US'),
-        heroUnit: '人（50 州 + 华盛顿特区）',
-        definition: '美国人口普查局 ACS 2025 1-Yr 统计的全美常住总人口；各州加总与全美口径完全一致。',
+        heroUnit: L('人（50 州 + 华盛顿特区）', 'residents (50 states + DC)'),
+        definition: L(
+          '美国人口普查局 ACS 2025 1-Yr 统计的全美常住总人口；各州加总与全美口径完全一致。',
+          'Total U.S. resident population from Census ACS 2025 1-Year estimates; state totals reconcile cleanly to the national figure.',
+        ),
         kpis,
-        breakdownTitle: '四大普查区人口分布（悬停高亮地图）',
+        breakdownTitle: L('四大普查区人口分布（悬停高亮地图）', 'Population by Census Region (hover to highlight map)'),
         segments,
         breakdownNote: null as string | null,
-        levelLabels: ['各州 (51)', '都会区'] as [string, string],
-        modeLabels: ['总人口', '21–25 增速'] as [string, string],
+        levelLabels: [L('各州 (51)', 'States (51)'), L('都会区', 'Metros')] as [string, string],
+        modeLabels: [L('总人口', 'Total Pop'), L('21–25 增速', '21–25 Growth')] as [string, string],
         rankHint,
         rows,
         advisorId: 'people',
-        advisorLabel: '人口与迁徙顾问',
+        advisorLabel: L('人口与迁徙顾问', 'People Advisor'),
         lensId: 'density',
-        lensLabel: '密度视角',
+        lensLabel: L('密度视角', 'Density Lens'),
       };
     }
 
@@ -420,9 +441,9 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
       const crop = n.land_national?.crop ?? 0.167;
       const pasture = n.land_national?.pasture ?? 0.064;
       const kpis = [
-        { label: '占全美总就业', value: `${share.toFixed(2)}%`, sub: `约每 ${Math.round(usEmp / foodW)} 人 1 名`, color: 'var(--y-food)' },
-        { label: '农林渔牧 GDP', value: fmtMoney3(agriGdp * 1e6), sub: `占全美 GDP ${((agriGdp / n.gdp_musd) * 100).toFixed(2)}%` },
-        { label: '耕地与牧草', value: `${((crop + pasture) * 100).toFixed(1)}%`, sub: `耕地 ${(crop * 100).toFixed(1)}% · 牧草 ${(pasture * 100).toFixed(1)}%` },
+        { label: L('占全美总就业', 'Share of Jobs'), value: `${share.toFixed(2)}%`, sub: L(`约每 ${Math.round(usEmp / foodW)} 人 1 名`, `~1 in ${Math.round(usEmp / foodW)} workers`), color: 'var(--y-food)' },
+        { label: L('农林渔牧 GDP', 'Agri & Forestry GDP'), value: fmtMoney3(agriGdp * 1e6), sub: L(`占全美 GDP ${((agriGdp / n.gdp_musd) * 100).toFixed(2)}%`, `${((agriGdp / n.gdp_musd) * 100).toFixed(2)}% of U.S. GDP`) },
+        { label: L('耕地与牧草', 'Crops & Pasture'), value: `${((crop + pasture) * 100).toFixed(1)}%`, sub: L(`耕地 ${(crop * 100).toFixed(1)}% · 牧草 ${(pasture * 100).toFixed(1)}%`, `Crop ${(crop * 100).toFixed(1)}% · Pasture ${(pasture * 100).toFixed(1)}%`) },
       ];
       const segments = buildRegionSegments((s) => s.yields_workers?.food ?? 0, (v) => fmtCount3(v));
 
@@ -441,7 +462,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
                 kind: 'state',
                 label: s.name,
                 sublabel: s.abbr,
-                detail: `占比 ${((w / s.employed!) * 100).toFixed(1)}%`,
+                detail: L(`占比 ${((w / s.employed!) * 100).toFixed(1)}%`, `${((w / s.employed!) * 100).toFixed(1)}% share`),
                 value: w,
                 valueText: fmtCount3(w),
                 hexIds: stateHexMap.get(s.fips) ?? [],
@@ -459,7 +480,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
                 kind: 'state',
                 label: s.name,
                 sublabel: s.abbr,
-                detail: `${fmtCount3(w)} 人`,
+                detail: L(`${fmtCount3(w)} 人`, `${fmtCount3(w)} workers`),
                 value: sh,
                 valueText: `${(sh * 100).toFixed(1)}%`,
                 hexIds: stateHexMap.get(s.fips) ?? [],
@@ -468,7 +489,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
         }
       } else {
         const valid = cities.filter((c) => (c.yields_workers?.food ?? 0) > 0 && (c.employed ?? 0) > 0 && (rankMode === 'primary' || c.pop >= 100000));
-        if (rankMode === 'secondary') rankHint = '就业占比排行仅计 10 万+ 人口都会区（过滤极小样本波动）';
+        if (rankMode === 'secondary') rankHint = L('就业占比排行仅计 10 万+ 人口都会区（过滤极小样本波动）', 'Job-share ranking includes metros with 100K+ population only');
         if (rankMode === 'primary') {
           rows = [...valid]
             .sort((a, b) => (b.yields_workers?.food ?? 0) - (a.yields_workers?.food ?? 0))
@@ -480,7 +501,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
                 kind: 'city',
                 label: c.short_name,
                 sublabel: c.state_abbr,
-                detail: `占比 ${((w / c.employed!) * 100).toFixed(1)}%`,
+                detail: L(`占比 ${((w / c.employed!) * 100).toFixed(1)}%`, `${((w / c.employed!) * 100).toFixed(1)}% share`),
                 value: w,
                 valueText: fmtCount3(w),
                 hexIds: c.hex_ids,
@@ -498,7 +519,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
                 kind: 'city',
                 label: c.short_name,
                 sublabel: c.state_abbr,
-                detail: `${fmtCount3(w)} 人`,
+                detail: L(`${fmtCount3(w)} 人`, `${fmtCount3(w)} workers`),
                 value: sh,
                 valueText: `${(sh * 100).toFixed(1)}%`,
                 hexIds: c.hex_ids,
@@ -509,20 +530,23 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
 
       return {
         heroValue: foodW.toLocaleString('en-US'),
-        heroUnit: '名农林渔牧从业者',
-        definition: '农、林、渔、牧与狩猎业（ACS C24030 · NAICS 11）按居住地统计的从业人数，对应沙盘中的国家「粮食」产出。',
+        heroUnit: L('名农林渔牧从业者', 'agriculture, forestry & fishing workers'),
+        definition: L(
+          '农、林、渔、牧与狩猎业（ACS C24030 · NAICS 11）按居住地统计的从业人数，对应沙盘中的国家「粮食」产出。',
+          'Employed residents in Agriculture, Forestry, Fishing & Hunting (ACS C24030 · NAICS 11) by place of residence — mapped to the national Food yield.',
+        ),
         kpis,
-        breakdownTitle: '四大普查区农林渔牧从业分布（悬停高亮地图）',
+        breakdownTitle: L('四大普查区农林渔牧从业分布（悬停高亮地图）', 'Agri & Forestry Workers by Region (hover to highlight)'),
         segments,
-        breakdownNote: '注：陆地耕地与牧草覆盖率源自 USGS NLCD 2021 美国本土口径。',
-        levelLabels: ['各州 (51)', '都会区'] as [string, string],
-        modeLabels: ['从业人数', '就业占比'] as [string, string],
+        breakdownNote: L('注：陆地耕地与牧草覆盖率源自 USGS NLCD 2021 美国本土口径。', 'Note: Cropland and pasture land-cover shares are from USGS NLCD 2021 (Lower 48).'),
+        levelLabels: [L('各州 (51)', 'States (51)'), L('都会区', 'Metros')] as [string, string],
+        modeLabels: [L('从业人数', 'Workers'), L('就业占比', 'Job Share')] as [string, string],
         rankHint,
         rows,
         advisorId: 'land',
-        advisorLabel: '土地与生态顾问',
+        advisorLabel: L('土地与生态顾问', 'Land Advisor'),
         lensId: 'farmland',
-        lensLabel: '农田视角',
+        lensLabel: L('农田视角', 'Farmland Lens'),
       };
     }
 
@@ -536,14 +560,14 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
       const prodGdp = mfgGdp + conGdp + minGdp;
 
       const kpis = [
-        { label: '占全美总就业', value: `${((prodW / usEmp) * 100).toFixed(1)}%`, sub: `约每 ${Math.round(usEmp / prodW)} 人 1 名`, color: 'var(--y-prod)' },
-        { label: '三行业 GDP 合计', value: fmtMoney3(prodGdp * 1e6), sub: `占全美 GDP ${((prodGdp / n.gdp_musd) * 100).toFixed(1)}%` },
-        { label: '全美发电总装机', value: fmtMw(n.power_all_mw ?? n.power_mw), sub: `入图大型 ${fmtMw(n.power_mw)}` },
+        { label: L('占全美总就业', 'Share of Jobs'), value: `${((prodW / usEmp) * 100).toFixed(1)}%`, sub: L(`约每 ${Math.round(usEmp / prodW)} 人 1 名`, `~1 in ${Math.round(usEmp / prodW)} workers`), color: 'var(--y-prod)' },
+        { label: L('三行业 GDP 合计', '3-Sector GDP'), value: fmtMoney3(prodGdp * 1e6), sub: L(`占全美 GDP ${((prodGdp / n.gdp_musd) * 100).toFixed(1)}%`, `${((prodGdp / n.gdp_musd) * 100).toFixed(1)}% of U.S. GDP`) },
+        { label: L('全美发电总装机', 'Total U.S. Power'), value: fmtMw(n.power_all_mw ?? n.power_mw), sub: L(`入图大型 ${fmtMw(n.power_mw)}`, `Mapped large ${fmtMw(n.power_mw)}`) },
       ];
       const segments: SegmentItem[] = [
-        { key: 'manufacturing', label: '制造业 Manufacturing', value: mfgW, valueText: fmtCount3(mfgW), subText: `${((mfgW / prodW) * 100).toFixed(1)}% · GDP ${fmtMoney3(mfgGdp * 1e6)}`, color: '#d9823b' },
-        { key: 'construction', label: '建筑业 Construction', value: conW, valueText: fmtCount3(conW), subText: `${((conW / prodW) * 100).toFixed(1)}% · GDP ${fmtMoney3(conGdp * 1e6)}`, color: '#e6b45a' },
-        { key: 'mining', label: '采矿与油气 Mining', value: minW, valueText: fmtCount3(minW), subText: `${((minW / prodW) * 100).toFixed(1)}% · GDP ${fmtMoney3(minGdp * 1e6)}`, color: '#9c7c65' },
+        { key: 'manufacturing', label: L('制造业 Manufacturing', 'Manufacturing'), value: mfgW, valueText: fmtCount3(mfgW), subText: `${((mfgW / prodW) * 100).toFixed(1)}% · GDP ${fmtMoney3(mfgGdp * 1e6)}`, color: '#d9823b' },
+        { key: 'construction', label: L('建筑业 Construction', 'Construction'), value: conW, valueText: fmtCount3(conW), subText: `${((conW / prodW) * 100).toFixed(1)}% · GDP ${fmtMoney3(conGdp * 1e6)}`, color: '#e6b45a' },
+        { key: 'mining', label: L('采矿与油气 Mining', 'Mining & Oil/Gas'), value: minW, valueText: fmtCount3(minW), subText: `${((minW / prodW) * 100).toFixed(1)}% · GDP ${fmtMoney3(minGdp * 1e6)}`, color: '#9c7c65' },
       ];
 
       let rows: RankRow[] = [];
@@ -561,7 +585,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
                 kind: 'state',
                 label: s.name,
                 sublabel: s.abbr,
-                detail: `占比 ${((w / s.employed!) * 100).toFixed(1)}%`,
+                detail: L(`占比 ${((w / s.employed!) * 100).toFixed(1)}%`, `${((w / s.employed!) * 100).toFixed(1)}% share`),
                 value: w,
                 valueText: fmtCount3(w),
                 hexIds: stateHexMap.get(s.fips) ?? [],
@@ -579,7 +603,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
                 kind: 'state',
                 label: s.name,
                 sublabel: s.abbr,
-                detail: `${fmtCount3(w)} 人`,
+                detail: L(`${fmtCount3(w)} 人`, `${fmtCount3(w)} workers`),
                 value: sh,
                 valueText: `${(sh * 100).toFixed(1)}%`,
                 hexIds: stateHexMap.get(s.fips) ?? [],
@@ -588,7 +612,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
         }
       } else {
         const valid = cities.filter((c) => (c.yields_workers?.production ?? 0) > 0 && (c.employed ?? 0) > 0 && (rankMode === 'primary' || c.pop >= 250000));
-        if (rankMode === 'secondary') rankHint = '就业占比排行仅计 25 万+ 人口都会区';
+        if (rankMode === 'secondary') rankHint = L('就业占比排行仅计 25 万+ 人口都会区', 'Job-share ranking includes metros with 250K+ population only');
         if (rankMode === 'primary') {
           rows = [...valid]
             .sort((a, b) => (b.yields_workers?.production ?? 0) - (a.yields_workers?.production ?? 0))
@@ -600,7 +624,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
                 kind: 'city',
                 label: c.short_name,
                 sublabel: c.state_abbr,
-                detail: `占比 ${((w / c.employed!) * 100).toFixed(1)}%`,
+                detail: L(`占比 ${((w / c.employed!) * 100).toFixed(1)}%`, `${((w / c.employed!) * 100).toFixed(1)}% share`),
                 value: w,
                 valueText: fmtCount3(w),
                 hexIds: c.hex_ids,
@@ -618,7 +642,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
                 kind: 'city',
                 label: c.short_name,
                 sublabel: c.state_abbr,
-                detail: `${fmtCount3(w)} 人`,
+                detail: L(`${fmtCount3(w)} 人`, `${fmtCount3(w)} workers`),
                 value: sh,
                 valueText: `${(sh * 100).toFixed(1)}%`,
                 hexIds: c.hex_ids,
@@ -629,29 +653,32 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
 
       return {
         heroValue: prodW.toLocaleString('en-US'),
-        heroUnit: '名实体生产从业者',
-        definition: '实体建造与工业产出三大核心行业之和：制造业 + 建筑业 + 采矿与油气业（ACS C24030 居住地就业口径）。',
+        heroUnit: L('名实体生产从业者', 'goods-producing workers'),
+        definition: L(
+          '实体建造与工业产出三大核心行业之和：制造业 + 建筑业 + 采矿与油气业（ACS C24030 居住地就业口径）。',
+          'Combined workers across the three physical goods-producing sectors: Manufacturing + Construction + Mining & Oil/Gas (ACS C24030 by residence).',
+        ),
         kpis,
-        breakdownTitle: '生产力三行业构成拆解（就业人数与 BEA 增加值）',
+        breakdownTitle: L('生产力三行业构成拆解（就业人数与 BEA 增加值）', '3-Sector Production Breakdown (Workers & BEA Value-Added)'),
         segments,
         breakdownNote: null as string | null,
-        levelLabels: ['各州 (51)', '都会区'] as [string, string],
-        modeLabels: ['从业人数', '就业占比'] as [string, string],
+        levelLabels: [L('各州 (51)', 'States (51)'), L('都会区', 'Metros')] as [string, string],
+        modeLabels: [L('从业人数', 'Workers'), L('就业占比', 'Job Share')] as [string, string],
         rankHint,
         rows,
         advisorId: 'economy',
-        advisorLabel: '宏观经济顾问',
+        advisorLabel: L('宏观经济顾问', 'Economy Advisor'),
         lensId: null as string | null,
         secondaryAdvisorId: 'energy' as string | null,
-        secondaryAdvisorLabel: '能源与矿产',
+        secondaryAdvisorLabel: L('能源与矿产', 'Energy & Mines'),
       };
     }
 
     if (metric === 'gold') {
       const kpis = [
-        { label: '全美人均 GDP', value: `$${n.gdp_per_cap.toLocaleString('en-US')}`, sub: '2024 GDP ÷ 2025 人口', color: 'var(--y-gold)' },
-        { label: '家庭中位收入', value: `$${n.median_income.toLocaleString('en-US')}`, sub: 'ACS 2025 1-Yr' },
-        { label: '都会区贡献', value: `${((totals.citiesGdp / n.gdp_musd) * 100).toFixed(1)}%`, sub: `${cities.length} 城合计 ${fmtMoney3(totals.citiesGdp * 1e6)}` },
+        { label: L('全美人均 GDP', 'U.S. GDP / Capita'), value: `$${n.gdp_per_cap.toLocaleString('en-US')}`, sub: L('2024 GDP ÷ 2025 人口', '2024 GDP ÷ 2025 Pop'), color: 'var(--y-gold)' },
+        { label: L('家庭中位收入', 'Median Income'), value: `$${n.median_income.toLocaleString('en-US')}`, sub: 'ACS 2025 1-Yr' },
+        { label: L('都会区贡献', 'Metro Share'), value: `${((totals.citiesGdp / n.gdp_musd) * 100).toFixed(1)}%`, sub: L(`${cities.length} 城合计 ${fmtMoney3(totals.citiesGdp * 1e6)}`, `${cities.length} metros · ${fmtMoney3(totals.citiesGdp * 1e6)}`) },
       ];
       const sectors = n.gdp_by_industry ?? [];
       const top5 = sectors.slice(0, 5);
@@ -659,7 +686,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
       const segments: SegmentItem[] = [
         ...top5.map((sec, i) => ({
           key: sec.key,
-          label: sec.name,
+          label: localizeIndustry(sec.key, sec.name, locale),
           value: sec.musd,
           valueText: fmtMoney3(sec.musd * 1e6),
           subText: `${((sec.musd / n.gdp_musd) * 100).toFixed(1)}%`,
@@ -668,7 +695,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
         ...(restMusd > 0
           ? [{
               key: 'other_15',
-              label: `其余 ${Math.max(0, sectors.length - 5)} 个行业`,
+              label: L(`其余 ${Math.max(0, sectors.length - 5)} 个行业`, `Other ${Math.max(0, sectors.length - 5)} industries`),
               value: restMusd,
               valueText: fmtMoney3(restMusd * 1e6),
               subText: `${((restMusd / n.gdp_musd) * 100).toFixed(1)}%`,
@@ -689,7 +716,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
               kind: 'state',
               label: s.name,
               sublabel: s.abbr,
-              detail: `占全美 ${((s.gdp_musd / n.gdp_musd) * 100).toFixed(1)}%`,
+              detail: L(`占全美 ${((s.gdp_musd / n.gdp_musd) * 100).toFixed(1)}%`, `${((s.gdp_musd / n.gdp_musd) * 100).toFixed(1)}% of U.S.`),
               value: s.gdp_musd,
               valueText: fmtMoney3(s.gdp_musd * 1e6),
               hexIds: stateHexMap.get(s.fips) ?? [],
@@ -720,13 +747,13 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
               kind: 'city',
               label: c.short_name,
               sublabel: c.state_abbr,
-              detail: `人均 ${fmtMoney3(c.gdp_per_cap)}`,
+              detail: L(`人均 ${fmtMoney3(c.gdp_per_cap)}`, `${fmtMoney3(c.gdp_per_cap)}/cap`),
               value: c.gdp_musd ?? 0,
               valueText: fmtMoney3((c.gdp_musd ?? 0) * 1e6),
               hexIds: c.hex_ids,
             }));
         } else {
-          rankHint = '人均 GDP 排行仅计 25 万+ 人口都会区（避免单一油气/矿区极值）';
+          rankHint = L('人均 GDP 排行仅计 25 万+ 人口都会区（避免单一油气/矿区极值）', 'GDP per capita ranking includes 250K+ metros only (avoids tiny resource-enclave outliers)');
           rows = [...cities]
             .filter((c) => c.pop >= 250000 && (c.gdp_per_cap ?? 0) > 0)
             .sort((a, b) => (b.gdp_per_cap ?? 0) - (a.gdp_per_cap ?? 0))
@@ -746,20 +773,26 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
 
       return {
         heroValue: `$${(n.gdp_musd / 1e6).toFixed(2)}T`,
-        heroUnit: `($${Math.round(n.gdp_musd).toLocaleString('en-US')}M 现价美元)`,
-        definition: '美国经济分析局 BEA CAGDP2 公布的 2024 年现价国内生产总值，按经济活动发生地统计；沙盘中每 +1 金币对应 $10 亿 GDP。',
+        heroUnit: L(`($${Math.round(n.gdp_musd).toLocaleString('en-US')}M 现价美元)`, `($${Math.round(n.gdp_musd).toLocaleString('en-US')}M current USD)`),
+        definition: L(
+          '美国经济分析局 BEA CAGDP2 公布的 2024 年现价国内生产总值，按经济活动发生地统计；沙盘中每 +1 金币对应 $10 亿 GDP。',
+          '2024 current-dollar GDP from BEA CAGDP2 by place of production; each +1 Gold on the strategy map equals $1B of annual GDP.',
+        ),
         kpis,
-        breakdownTitle: '全美 GDP 前五大支柱行业（BEA 20 行业全量口径）',
+        breakdownTitle: L('全美 GDP 前五大支柱行业（BEA 20 行业全量口径）', 'Top 5 GDP Industries (BEA All 20 Sectors)'),
         segments,
-        breakdownNote: '注：50 州 + DC 合计 $29.14T，与全美 $29.30T 的微小差额为联邦海外军事与未分摊产出。',
-        levelLabels: ['各州 (51)', '都会区'] as [string, string],
-        modeLabels: ['GDP 总量', '人均 GDP'] as [string, string],
+        breakdownNote: L(
+          '注：50 州 + DC 合计 $29.14T，与全美 $29.30T 的微小差额为联邦海外军事与未分摊产出。',
+          'Note: The 50 states + DC sum to $29.14T; the slight gap vs. $29.30T reflects federal overseas military and unallocated output.',
+        ),
+        levelLabels: [L('各州 (51)', 'States (51)'), L('都会区', 'Metros')] as [string, string],
+        modeLabels: [L('GDP 总量', 'Total GDP'), L('人均 GDP', 'GDP / Cap')] as [string, string],
         rankHint,
         rows,
         advisorId: 'economy',
-        advisorLabel: '宏观经济顾问',
+        advisorLabel: L('宏观经济顾问', 'Economy Advisor'),
         lensId: 'income',
-        lensLabel: '收入视角',
+        lensLabel: L('收入视角', 'Income Lens'),
         showLedgerBtn: true,
       };
     }
@@ -772,13 +805,13 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
       const sciGdp = profGdp + infoGdp;
 
       const kpis = [
-        { label: '占全美总就业', value: `${((sciW / usEmp) * 100).toFixed(1)}%`, sub: `两行业 GDP ${fmtMoney3(sciGdp * 1e6)}`, color: 'var(--y-science)' },
-        { label: '本科及以上学历', value: `${(n.bachelors_pct * 100).toFixed(1)}%`, sub: '25岁+ 成人 · ACS' },
-        { label: 'STEM 职业密度', value: `1 / ${n.stem_one_in}`, sub: `占在职者 ${(n.stem_share * 100).toFixed(1)}%` },
+        { label: L('占全美总就业', 'Share of Jobs'), value: `${((sciW / usEmp) * 100).toFixed(1)}%`, sub: L(`两行业 GDP ${fmtMoney3(sciGdp * 1e6)}`, `2-sector GDP ${fmtMoney3(sciGdp * 1e6)}`), color: 'var(--y-science)' },
+        { label: L('本科及以上学历', 'Bachelor’s+'), value: `${(n.bachelors_pct * 100).toFixed(1)}%`, sub: L('25岁+ 成人 · ACS', 'Adults 25+ · ACS') },
+        { label: L('STEM 职业密度', 'STEM Density'), value: `1 / ${n.stem_one_in}`, sub: L(`占在职者 ${(n.stem_share * 100).toFixed(1)}%`, `${(n.stem_share * 100).toFixed(1)}% of workers`) },
       ];
       const segments: SegmentItem[] = [
-        { key: 'professional', label: '专业、科研与技术服务', value: profW, valueText: fmtCount3(profW), subText: `${((profW / sciW) * 100).toFixed(1)}% · GDP ${fmtMoney3(profGdp * 1e6)}`, color: '#4fa3e0' },
-        { key: 'information', label: '信息与软件业', value: infoW, valueText: fmtCount3(infoW), subText: `${((infoW / sciW) * 100).toFixed(1)}% · GDP ${fmtMoney3(infoGdp * 1e6)}`, color: '#8ac5f4' },
+        { key: 'professional', label: L('专业、科研与技术服务', 'Professional & Scientific Services'), value: profW, valueText: fmtCount3(profW), subText: `${((profW / sciW) * 100).toFixed(1)}% · GDP ${fmtMoney3(profGdp * 1e6)}`, color: '#4fa3e0' },
+        { key: 'information', label: L('信息与软件业', 'Information & Software'), value: infoW, valueText: fmtCount3(infoW), subText: `${((infoW / sciW) * 100).toFixed(1)}% · GDP ${fmtMoney3(infoGdp * 1e6)}`, color: '#8ac5f4' },
       ];
 
       let rows: RankRow[] = [];
@@ -796,7 +829,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
                 kind: 'state',
                 label: s.name,
                 sublabel: s.abbr,
-                detail: `占比 ${((w / s.employed!) * 100).toFixed(1)}%`,
+                detail: L(`占比 ${((w / s.employed!) * 100).toFixed(1)}%`, `${((w / s.employed!) * 100).toFixed(1)}% share`),
                 value: w,
                 valueText: fmtCount3(w),
                 hexIds: stateHexMap.get(s.fips) ?? [],
@@ -814,7 +847,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
                 kind: 'state',
                 label: s.name,
                 sublabel: s.abbr,
-                detail: `${fmtCount3(w)} 人`,
+                detail: L(`${fmtCount3(w)} 人`, `${fmtCount3(w)} workers`),
                 value: sh,
                 valueText: `${(sh * 100).toFixed(1)}%`,
                 hexIds: stateHexMap.get(s.fips) ?? [],
@@ -823,7 +856,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
         }
       } else {
         const valid = cities.filter((c) => (c.yields_workers?.science ?? 0) > 0 && (c.employed ?? 0) > 0 && (rankMode === 'primary' || c.pop >= 250000));
-        if (rankMode === 'secondary') rankHint = '就业占比排行仅计 25 万+ 人口都会区';
+        if (rankMode === 'secondary') rankHint = L('就业占比排行仅计 25 万+ 人口都会区', 'Job-share ranking includes metros with 250K+ population only');
         if (rankMode === 'primary') {
           rows = [...valid]
             .sort((a, b) => (b.yields_workers?.science ?? 0) - (a.yields_workers?.science ?? 0))
@@ -835,7 +868,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
                 kind: 'city',
                 label: c.short_name,
                 sublabel: c.state_abbr,
-                detail: `占比 ${((w / c.employed!) * 100).toFixed(1)}%`,
+                detail: L(`占比 ${((w / c.employed!) * 100).toFixed(1)}%`, `${((w / c.employed!) * 100).toFixed(1)}% share`),
                 value: w,
                 valueText: fmtCount3(w),
                 hexIds: c.hex_ids,
@@ -853,7 +886,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
                 kind: 'city',
                 label: c.short_name,
                 sublabel: c.state_abbr,
-                detail: `${fmtCount3(w)} 人`,
+                detail: L(`${fmtCount3(w)} 人`, `${fmtCount3(w)} workers`),
                 value: sh,
                 valueText: `${(sh * 100).toFixed(1)}%`,
                 hexIds: c.hex_ids,
@@ -864,20 +897,26 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
 
       return {
         heroValue: sciW.toLocaleString('en-US'),
-        heroUnit: '名科研与信息从业者',
-        definition: '专业、科研与技术服务业（NAICS 54）及信息与软件业（NAICS 51）从业人数之和，按劳动者居住地统计。',
+        heroUnit: L('名科研与信息从业者', 'scientific & information workers'),
+        definition: L(
+          '专业、科研与技术服务业（NAICS 54）及信息与软件业（NAICS 51）从业人数之和，按劳动者居住地统计。',
+          'Combined employed residents in Professional, Scientific & Technical Services (NAICS 54) and Information (NAICS 51) by residence.',
+        ),
         kpis,
-        breakdownTitle: '科研产出双行业构成拆解（就业人数与 BEA 增加值）',
+        breakdownTitle: L('科研产出双行业构成拆解（就业人数与 BEA 增加值）', '2-Sector Science Breakdown (Workers & BEA Value-Added)'),
         segments,
-        breakdownNote: '注：按行业而非职业统计，因此科技公司行政人员计入其中，医院内的临床研究员则计入医疗业。',
-        levelLabels: ['各州 (51)', '都会区'] as [string, string],
-        modeLabels: ['从业人数', '就业占比'] as [string, string],
+        breakdownNote: L(
+          '注：按行业而非职业统计，因此科技公司行政人员计入其中，医院内的临床研究员则计入医疗业。',
+          'Note: Counted by industry rather than occupation, so admin staff at tech firms are included while hospital clinical researchers count under Health Care.',
+        ),
+        levelLabels: [L('各州 (51)', 'States (51)'), L('都会区', 'Metros')] as [string, string],
+        modeLabels: [L('从业人数', 'Workers'), L('就业占比', 'Job Share')] as [string, string],
         rankHint,
         rows,
         advisorId: 'knowledge',
-        advisorLabel: '科研与知识顾问',
+        advisorLabel: L('科研与知识顾问', 'Knowledge Advisor'),
         lensId: 'bachelors',
-        lensLabel: '学历视角',
+        lensLabel: L('学历视角', 'Degrees Lens'),
       };
     }
 
@@ -886,9 +925,9 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
       const accW = jobs.accommodation ?? 11019944;
       const accGdp = gdpByKey.get('accommodation') ?? 960356;
       const kpis = [
-        { label: '占全美总就业', value: `${((culW / usEmp) * 100).toFixed(2)}%`, sub: `约每 ${Math.round(usEmp / culW)} 人 1 名`, color: 'var(--y-culture)' },
-        { label: '文化艺术 GDP', value: fmtMoney3(artsGdp * 1e6), sub: `占全美 GDP ${((artsGdp / n.gdp_musd) * 100).toFixed(2)}%` },
-        { label: '国家公园年游客', value: fmtCount3(n.park_visits ?? 323014305), sub: `${n.total_wonders} 处公开规则奇观` },
+        { label: L('占全美总就业', 'Share of Jobs'), value: `${((culW / usEmp) * 100).toFixed(2)}%`, sub: L(`约每 ${Math.round(usEmp / culW)} 人 1 名`, `~1 in ${Math.round(usEmp / culW)} workers`), color: 'var(--y-culture)' },
+        { label: L('文化艺术 GDP', 'Arts & Rec GDP'), value: fmtMoney3(artsGdp * 1e6), sub: L(`占全美 GDP ${((artsGdp / n.gdp_musd) * 100).toFixed(2)}%`, `${((artsGdp / n.gdp_musd) * 100).toFixed(2)}% of U.S. GDP`) },
+        { label: L('国家公园年游客', 'NPS Park Visits'), value: fmtCount3(n.park_visits ?? 323014305), sub: L(`${n.total_wonders} 处公开规则奇观`, `${n.total_wonders} published-rule wonders`) },
       ];
       const segments = buildRegionSegments((s) => s.yields_workers?.culture ?? 0, (v) => fmtCount3(v));
 
@@ -907,7 +946,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
                 kind: 'state',
                 label: s.name,
                 sublabel: s.abbr,
-                detail: `占比 ${((w / s.employed!) * 100).toFixed(1)}%`,
+                detail: L(`占比 ${((w / s.employed!) * 100).toFixed(1)}%`, `${((w / s.employed!) * 100).toFixed(1)}% share`),
                 value: w,
                 valueText: fmtCount3(w),
                 hexIds: stateHexMap.get(s.fips) ?? [],
@@ -925,7 +964,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
                 kind: 'state',
                 label: s.name,
                 sublabel: s.abbr,
-                detail: `${fmtCount3(w)} 人`,
+                detail: L(`${fmtCount3(w)} 人`, `${fmtCount3(w)} workers`),
                 value: sh,
                 valueText: `${(sh * 100).toFixed(1)}%`,
                 hexIds: stateHexMap.get(s.fips) ?? [],
@@ -934,7 +973,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
         }
       } else {
         const valid = cities.filter((c) => (c.yields_workers?.culture ?? 0) > 0 && (c.employed ?? 0) > 0 && (rankMode === 'primary' || c.pop >= 250000));
-        if (rankMode === 'secondary') rankHint = '就业占比排行仅计 25 万+ 人口都会区';
+        if (rankMode === 'secondary') rankHint = L('就业占比排行仅计 25 万+ 人口都会区', 'Job-share ranking includes metros with 250K+ population only');
         if (rankMode === 'primary') {
           rows = [...valid]
             .sort((a, b) => (b.yields_workers?.culture ?? 0) - (a.yields_workers?.culture ?? 0))
@@ -946,7 +985,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
                 kind: 'city',
                 label: c.short_name,
                 sublabel: c.state_abbr,
-                detail: `占比 ${((w / c.employed!) * 100).toFixed(1)}%`,
+                detail: L(`占比 ${((w / c.employed!) * 100).toFixed(1)}%`, `${((w / c.employed!) * 100).toFixed(1)}% share`),
                 value: w,
                 valueText: fmtCount3(w),
                 hexIds: c.hex_ids,
@@ -964,7 +1003,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
                 kind: 'city',
                 label: c.short_name,
                 sublabel: c.state_abbr,
-                detail: `${fmtCount3(w)} 人`,
+                detail: L(`${fmtCount3(w)} 人`, `${fmtCount3(w)} workers`),
                 value: sh,
                 valueText: `${(sh * 100).toFixed(1)}%`,
                 hexIds: c.hex_ids,
@@ -975,20 +1014,26 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
 
       return {
         heroValue: culW.toLocaleString('en-US'),
-        heroUnit: '名文化艺术与娱乐从业者',
-        definition: '文化、表演艺术、博物馆、体育与休闲娱乐业（ACS C24030 · NAICS 71）从业人数，对应沙盘中的国家「文化」产出。',
+        heroUnit: L('名文化艺术与娱乐从业者', 'arts, entertainment & recreation workers'),
+        definition: L(
+          '文化、表演艺术、博物馆、体育与休闲娱乐业（ACS C24030 · NAICS 71）从业人数，对应沙盘中的国家「文化」产出。',
+          'Employed residents in Arts, Entertainment & Recreation (ACS C24030 · NAICS 71) — mapped to the national Culture yield.',
+        ),
         kpis,
-        breakdownTitle: '四大普查区文化艺术就业分布（悬停高亮地图）',
+        breakdownTitle: L('四大普查区文化艺术就业分布（悬停高亮地图）', 'Arts & Culture Workers by Region (hover to highlight)'),
         segments,
-        breakdownNote: `注：不含住宿与餐饮服务业（NAICS 72 另计 ${fmtCount3(accW)} 人 · GDP ${fmtMoney3(accGdp * 1e6)}）。`,
-        levelLabels: ['各州 (51)', '都会区'] as [string, string],
-        modeLabels: ['从业人数', '就业占比'] as [string, string],
+        breakdownNote: L(
+          `注：不含住宿与餐饮服务业（NAICS 72 另计 ${fmtCount3(accW)} 人 · GDP ${fmtMoney3(accGdp * 1e6)}）。`,
+          `Note: Excludes Accommodation & Food Services (NAICS 72 separately accounts for ${fmtCount3(accW)} workers · ${fmtMoney3(accGdp * 1e6)} GDP).`,
+        ),
+        levelLabels: [L('各州 (51)', 'States (51)'), L('都会区', 'Metros')] as [string, string],
+        modeLabels: [L('从业人数', 'Workers'), L('就业占比', 'Job Share')] as [string, string],
         rankHint,
         rows,
         advisorId: 'culture',
-        advisorLabel: '文化与奇观顾问',
+        advisorLabel: L('文化与奇观顾问', 'Culture Advisor'),
         lensId: 'amenities',
-        lensLabel: '宜居视角',
+        lensLabel: L('宜居视角', 'Wellbeing Lens'),
       };
     }
 
@@ -1009,20 +1054,22 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
     };
 
     const kpis = [
-      { label: '16岁+ 就业人口', value: fmtCount3(usEmp), sub: 'ACS 2025 C24030' },
+      { label: L('16岁+ 就业人口', 'Employed (16+)'), value: fmtCount3(usEmp), sub: 'ACS 2025 C24030' },
       {
-        label: '各州极值区间',
+        label: L('各州极值区间', 'State Range'),
         value: totals.minStateU && totals.maxStateU
           ? `${(totals.minStateU.unemployment! * 100).toFixed(1)}%–${(totals.maxStateU.unemployment! * 100).toFixed(1)}%`
           : '–',
-        sub: totals.minStateU && totals.maxStateU ? `最低 ${totals.minStateU.abbr} · 最高 ${totals.maxStateU.abbr}` : '',
+        sub: totals.minStateU && totals.maxStateU
+          ? L(`最低 ${totals.minStateU.abbr} · 最高 ${totals.maxStateU.abbr}`, `Low ${totals.minStateU.abbr} · High ${totals.maxStateU.abbr}`)
+          : '',
       },
-      { label: '全美房租负担', value: `${((n.rent_burden ?? 0.2204) * 100).toFixed(1)}%`, sub: `月租中位 $${(n.median_rent ?? 1557).toLocaleString()}` },
+      { label: L('全美房租负担', 'U.S. Rent Burden'), value: `${((n.rent_burden ?? 0.2204) * 100).toFixed(1)}%`, sub: L(`月租中位 $${(n.median_rent ?? 1557).toLocaleString()}`, `Median rent $${(n.median_rent ?? 1557).toLocaleString()}/mo`) },
     ];
     const segments: SegmentItem[] = [
-      { key: 'u_low', label: '<3.5% 就业紧俏', value: lowBucket.length, valueText: `${lowBucket.length} 州`, subText: `${((lowBucket.length / 51) * 100).toFixed(0)}%`, color: '#58c998', hexIds: hexesOf(lowBucket) },
-      { key: 'u_mid', label: '3.5–5.0% 温和区间', value: midBucket.length, valueText: `${midBucket.length} 州`, subText: `${((midBucket.length / 51) * 100).toFixed(0)}%`, color: '#d4ae5e', hexIds: hexesOf(midBucket) },
-      { key: 'u_high', label: '>5.0% 高于均值', value: highBucket.length, valueText: `${highBucket.length} 州`, subText: `${((highBucket.length / 51) * 100).toFixed(0)}%`, color: '#e8774a', hexIds: hexesOf(highBucket) },
+      { key: 'u_low', label: L('<3.5% 就业紧俏', '<3.5% Tight Market'), value: lowBucket.length, valueText: L(`${lowBucket.length} 州`, `${lowBucket.length} states`), subText: `${((lowBucket.length / 51) * 100).toFixed(0)}%`, color: '#58c998', hexIds: hexesOf(lowBucket) },
+      { key: 'u_mid', label: L('3.5–5.0% 温和区间', '3.5–5.0% Moderate'), value: midBucket.length, valueText: L(`${midBucket.length} 州`, `${midBucket.length} states`), subText: `${((midBucket.length / 51) * 100).toFixed(0)}%`, color: '#d4ae5e', hexIds: hexesOf(midBucket) },
+      { key: 'u_high', label: L('>5.0% 高于均值', '>5.0% Above Avg'), value: highBucket.length, valueText: L(`${highBucket.length} 州`, `${highBucket.length} states`), subText: `${((highBucket.length / 51) * 100).toFixed(0)}%`, color: '#e8774a', hexIds: hexesOf(highBucket) },
     ];
 
     const fmtDelta = (u: number) => {
@@ -1042,7 +1089,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
         kind: 'state',
         label: s.name,
         sublabel: s.abbr,
-        detail: `${fmtDelta(s.unemployment!)} vs 全美`,
+        detail: `${fmtDelta(s.unemployment!)} vs ${L('全美', 'U.S.')}`,
         value: s.unemployment!,
         valueText: `${(s.unemployment! * 100).toFixed(1)}%`,
         tone: rankMode === 'primary' ? 'good' : 'bad',
@@ -1050,7 +1097,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
         hexIds: stateHexMap.get(s.fips) ?? [],
       }));
     } else {
-      rankHint = '仅计 50 万+ 人口大型都会区（ACS 2025 1-Yr B23025）';
+      rankHint = L('仅计 50 万+ 人口大型都会区（ACS 2025 1-Yr B23025）', 'Large metros with 500K+ population only (ACS 2025 1-Yr B23025)');
       const valid = cities.filter((c) => c.pop >= 500000 && c.unemployment != null);
       const sorted = [...valid].sort((a, b) =>
         rankMode === 'primary' ? a.unemployment! - b.unemployment! : b.unemployment! - a.unemployment!,
@@ -1060,7 +1107,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
         kind: 'city',
         label: c.short_name,
         sublabel: c.state_abbr,
-        detail: `${fmtDelta(c.unemployment!)} vs 全美`,
+        detail: `${fmtDelta(c.unemployment!)} vs ${L('全美', 'U.S.')}`,
         value: c.unemployment!,
         valueText: `${(c.unemployment! * 100).toFixed(1)}%`,
         tone: rankMode === 'primary' ? 'good' : 'bad',
@@ -1071,22 +1118,28 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
 
     return {
       heroValue: `${(usUnemp * 100).toFixed(2)}%`,
-      heroUnit: '平民劳动力失业率',
-      definition: '16 岁及以上平民劳动力中正在求职的失业人数占比（失业人数 ÷ 平民劳动力总数，ACS 2025 1-Yr B23025）。',
+      heroUnit: L('平民劳动力失业率', 'civilian unemployment rate'),
+      definition: L(
+        '16 岁及以上平民劳动力中正在求职的失业人数占比（失业人数 ÷ 平民劳动力总数，ACS 2025 1-Yr B23025）。',
+        'Share of the civilian labor force age 16+ actively seeking work (unemployed ÷ civilian labor force, ACS 2025 1-Yr B23025).',
+      ),
       kpis,
-      breakdownTitle: '全美 51 州/特区失业率区间分布（悬停高亮地图）',
+      breakdownTitle: L('全美 51 州/特区失业率区间分布（悬停高亮地图）', '51 States/DC by Unemployment Band (hover to highlight)'),
       segments,
-      breakdownNote: '注：ACS 年度调查失业率与劳工统计局（BLS）月度 CPS 口径存在季节与样本统计差异。',
-      levelLabels: ['各州 (51)', '大都会 (50万+)'] as [string, string],
-      modeLabels: ['最低 Top 8', '最高 Top 8'] as [string, string],
+      breakdownNote: L(
+        '注：ACS 年度调查失业率与劳工统计局（BLS）月度 CPS 口径存在季节与样本统计差异。',
+        'Note: Annual ACS survey unemployment rates differ slightly from monthly BLS CPS figures due to seasonal and sampling methodology.',
+      ),
+      levelLabels: [L('各州 (51)', 'States (51)'), L('大都会 (50万+)', 'Large Metros (500K+)')] as [string, string],
+      modeLabels: [L('最低 Top 8', 'Lowest 8'), L('最高 Top 8', 'Highest 8')] as [string, string],
       rankHint,
       rows,
       advisorId: 'prosperity',
-      advisorLabel: '繁荣与住房顾问',
+      advisorLabel: L('繁荣与住房顾问', 'Prosperity Advisor'),
       lensId: 'poverty',
-      lensLabel: '贫困率视角',
+      lensLabel: L('贫困率视角', 'Poverty Lens'),
     };
-  }, [metric, rankLevel, rankMode, n, jobs, usEmp, usUnemp, foodW, prodW, sciW, culW, gdpByKey, totals, states, cities, stateHexMap, regionHexes, goodCol, badCol]);
+  }, [metric, rankLevel, rankMode, n, jobs, usEmp, usUnemp, foodW, prodW, sciW, culW, gdpByKey, totals, states, cities, stateHexMap, regionHexes, goodCol, badCol, locale]);
 
   const info = METRIC_META[metric];
   const popoverW = Math.min(416, viewportW - 24);
@@ -1135,18 +1188,19 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
             <div className="flex items-center gap-1.5">
               <span className="text-sm leading-none" style={{ color: info.accent }}>{info.icon}</span>
               <h3 className="font-display text-sm font-bold m-0 truncate" style={{ color: 'var(--ink-primary)' }}>
-                {info.title}
+                {isEn ? info.titleEn : info.title}
               </h3>
             </div>
             <div className="text-[10px] opacity-65 mt-0.5 truncate">
-              {info.titleEn} · <span className="font-mono-num">{info.sourceTag}</span>
+              {!isEn && <>{info.titleEn} · </>}
+              <span className="font-mono-num">{isEn ? info.sourceTagEn : info.sourceTag}</span>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="p-1 rounded-md hover:bg-[var(--surface-paper-hover)] opacity-70 hover:opacity-100 cursor-pointer shrink-0"
-            title="关闭 (Esc)"
+            title={L('关闭 (Esc)', 'Close (Esc)')}
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -1176,10 +1230,10 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
                     : 'border-transparent opacity-60 hover:opacity-100 hover:bg-[var(--surface-paper-hover)]'
                 }`}
                 style={active ? { color: theme === 'midnight' ? 'var(--brass-bright)' : 'var(--ink-primary)' } : undefined}
-                title={`切换至 ${m.title}`}
+                title={L(`切换至 ${m.title}`, `Switch to ${m.titleEn}`)}
               >
                 <span className="text-[10px] leading-none" style={{ color: m.accent }}>{m.icon}</span>
-                <span>{m.shortLabel}</span>
+                <span>{isEn ? m.shortLabelEn : m.shortLabel}</span>
               </button>
             );
           })}
@@ -1348,7 +1402,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
               </button>
             ))}
           </div>
-          <div className="text-[10px] opacity-55 text-right">悬停条目实时高亮地图 · 点击进入详情面板</div>
+          <div className="text-[10px] opacity-55 text-right">{L('悬停条目实时高亮地图 · 点击进入详情面板', 'Hover to highlight on map · Click to open detail panel')}</div>
         </div>
       </div>
 
@@ -1373,7 +1427,7 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
                 onClose();
               }}
               className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10.5px] font-semibold border border-[var(--border-hairline)] hover:bg-[var(--surface-paper-hover)] cursor-pointer"
-              title={`切换地图至「${content.lensLabel}」`}
+              title={L(`切换地图至「${content.lensLabel}」`, `Switch map to ${content.lensLabel}`)}
             >
               <Eye className="w-3 h-3 opacity-75" />
               <span>{content.lensLabel}</span>
@@ -1393,17 +1447,17 @@ export const TopMetricPopover: React.FC<TopMetricPopoverProps> = ({
               type="button"
               onClick={() => setYieldReportOpen(true)}
               className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10.5px] font-semibold border border-[var(--border-hairline)] hover:bg-[var(--surface-paper-hover)] cursor-pointer"
-              title="打开完整《联邦国家产出年鉴》排行榜"
+              title={L('打开完整《联邦国家产出年鉴》排行榜', 'Open full National Yield Ledger rankings')}
             >
               <Trophy className="w-3 h-3" style={{ color: 'var(--brass)' }} />
-              <span>年鉴总榜</span>
+              <span>{L('年鉴总榜', 'Ledger')}</span>
             </button>
           )}
           <button
             type="button"
             onClick={() => setAlmanacOpen(true, 'sources')}
             className="p-1.5 rounded-md border border-[var(--border-hairline)] hover:bg-[var(--surface-paper-hover)] opacity-75 hover:opacity-100 cursor-pointer"
-            title="在《联邦百科全书》查看全部 31 项数据源"
+            title={L('在《联邦百科全书》查看全部 31 项数据源', 'Inspect all 31 official data sources in Federal Almanac')}
           >
             <BookOpen className="w-3 h-3" />
           </button>

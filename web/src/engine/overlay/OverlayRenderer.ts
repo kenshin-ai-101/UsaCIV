@@ -11,6 +11,7 @@
 import type {
   CityRecord,
   LayerToggles,
+  Locale,
   MapLayersData,
   StateRecord,
   ThemeMode,
@@ -19,6 +20,7 @@ import type {
 } from '../../types/world';
 import type { MapBubbleSpec } from '../../store/useAppStore';
 import { STATE_HERALDIC_COLORS } from '../../features/lenses/lensConfig';
+import { localizeDistrictName } from '../../i18n';
 import type { MapCamera } from '../camera';
 import type { BannerHitBox, PointHitItem } from '../picking';
 import {
@@ -34,6 +36,7 @@ import {
 export interface OverlayRenderContext {
   camera: MapCamera;
   theme: ThemeMode;
+  locale: Locale;
   meta: WorldMeta;
   world: WorldHexData;
   cities: CityRecord[];
@@ -154,6 +157,7 @@ export function renderBackdropSea(
   meta: WorldMeta,
   layers: MapLayersData | null,
   theme: ThemeMode,
+  locale: Locale = 'zh',
 ) {
   const { width: w, height: h } = camera;
   const isMid = theme === 'midnight';
@@ -269,7 +273,10 @@ export function renderBackdropSea(
     ctx.lineWidth = 0.8;
     ctx.strokeRect(sx0 + 3.5, sy0 + 3.5, bw - 7, bh - 7);
 
-    const title = code === 'AK' ? 'ALASKA · 阿拉斯加 (0.35×)' : 'HAWAII · 夏威夷 (1.0×)';
+    const title =
+      locale === 'en'
+        ? (code === 'AK' ? 'ALASKA (0.35×)' : 'HAWAII (1.0×)')
+        : (code === 'AK' ? 'ALASKA · 阿拉斯加 (0.35×)' : 'HAWAII · 夏威夷 (1.0×)');
     ctx.font = '700 9.5px "Inter", "PingFang SC", sans-serif';
     const tw = ctx.measureText(title).width;
     ctx.fillStyle = isMid ? '#131E2B' : '#F6F1E7';
@@ -706,7 +713,7 @@ export function renderMapOverlay(ctx: CanvasRenderingContext2D, rc: OverlayRende
     ctx.restore();
     for (const dist of selectedCity.districts) {
       const [sx, sy] = camera.worldToScreen(dist.x, dist.y);
-      drawDistrictMiniature(ctx, sx, sy - 4, dist.id, 1.15, dist.name);
+      drawDistrictMiniature(ctx, sx, sy - 4, dist.id, 1.15, localizeDistrictName(dist.id, dist.name, rc.locale));
     }
   } else if (!advisorBubbles && scale >= 1.15) {
     for (let i = 0; i < Math.min(180, cities.length); i++) {
