@@ -91,6 +91,7 @@ export const GlobalMilitaryView: React.FC<GlobalMilitaryViewProps> = ({
   const [tooltip, setTooltip] = useState<{
     x: number;
     y: number;
+    fromList?: boolean;
     base?: GlobalBaseRecord;
     country?: GlobalCountryRecord;
     fleet?: NavyFleetRecord;
@@ -98,7 +99,7 @@ export const GlobalMilitaryView: React.FC<GlobalMilitaryViewProps> = ({
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cameraRef = useRef(new GlobalMapCamera());
-  const hitRef = useRef<GlobalHitResult>({ bases: [], countries: [], fleets: [] });
+  const hitRef = useRef<GlobalHitResult>({ bases: [], basePlaques: [], countries: [], countryPlaques: [], fleets: [] });
   const dirtyRef = useRef(true);
   const initializedRef = useRef(false);
 
@@ -347,6 +348,7 @@ export const GlobalMilitaryView: React.FC<GlobalMilitaryViewProps> = ({
     sx: number,
     sy: number,
   ): { base?: GlobalBaseRecord; country?: GlobalCountryRecord; fleet?: NavyFleetRecord } | null => {
+    // 1. Base icon markers (highest priority)
     let bestB: GlobalBaseRecord | undefined;
     let bestBD2 = Infinity;
     for (let i = hitRef.current.bases.length - 1; i >= 0; i--) {
@@ -359,6 +361,23 @@ export const GlobalMilitaryView: React.FC<GlobalMilitaryViewProps> = ({
     }
     if (bestB) return { base: bestB };
 
+    // 2. Base nameplate plaques (hovering the base name also reveals full details!)
+    for (let i = hitRef.current.basePlaques.length - 1; i >= 0; i--) {
+      const p = hitRef.current.basePlaques[i];
+      if (sx >= p.x0 - 2 && sx <= p.x1 + 2 && sy >= p.y0 - 2 && sy <= p.y1 + 2) {
+        return { base: p.base };
+      }
+    }
+
+    // 3. Host nation dual-tone plaques
+    for (let i = hitRef.current.countryPlaques.length - 1; i >= 0; i--) {
+      const p = hitRef.current.countryPlaques[i];
+      if (sx >= p.x0 - 2 && sx <= p.x1 + 2 && sy >= p.y0 - 2 && sy <= p.y1 + 2) {
+        return { country: p.country };
+      }
+    }
+
+    // 4. Host nation troop rings
     let bestC: GlobalCountryRecord | undefined;
     let bestCD2 = Infinity;
     for (let i = hitRef.current.countries.length - 1; i >= 0; i--) {
@@ -371,8 +390,12 @@ export const GlobalMilitaryView: React.FC<GlobalMilitaryViewProps> = ({
     }
     if (bestC) return { country: bestC };
 
+    // 5. U.S. Navy Numbered Fleet medallions
     for (let i = hitRef.current.fleets.length - 1; i >= 0; i--) {
       const h = hitRef.current.fleets[i];
+      if (sx >= h.x0 - 3 && sx <= h.x1 + 3 && sy >= h.y0 - 3 && sy <= h.y1 + 3) {
+        return { fleet: h.fleet };
+      }
       const d2 = (sx - h.sx) * (sx - h.sx) + (sy - h.sy) * (sy - h.sy);
       if (d2 <= h.r * h.r) return { fleet: h.fleet };
     }
@@ -574,6 +597,35 @@ export const GlobalMilitaryView: React.FC<GlobalMilitaryViewProps> = ({
     [dataset, selectedCountry],
   );
 
+  const countryByName = useMemo(() => {
+    const m = new Map<string, GlobalCountryRecord>();
+    if (dataset) for (const c of dataset.countries) m.set(c.name, c);
+    return m;
+  }, [dataset]);
+
+  const baseRankById = useMemo(() => {
+    const m = new Map<string, number>();
+    if (!dataset) return m;
+    const sorted = [...dataset.bases].sort((a, b) => b.prv_musd - a.prv_musd);
+    sorted.forEach((b, i) => m.set(b.id, i + 1));
+    return m;
+  }, [dataset]);
+
+  const topBasesByCountry = useMemo(() => {
+    const m = new Map<string, GlobalBaseRecord[]>();
+    if (!dataset) return m;
+    for (const b of dataset.bases) {
+      let arr = m.get(b.country);
+      if (!arr) {
+        arr = [];
+        m.set(b.country, arr);
+      }
+      arr.push(b);
+    }
+    for (const arr of m.values()) arr.sort((a, b) => b.prv_musd - a.prv_musd);
+    return m;
+  }, [dataset]);
+
   const toggleBranch = (br: string) => {
     setActiveBranches((prev) => {
       const next = new Set(prev);
@@ -643,107 +695,272 @@ export const GlobalMilitaryView: React.FC<GlobalMilitaryViewProps> = ({
         className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing touch-none"
       />
 
-      {/* Rich Hover Tooltip (Bases, Host Countries & Navy Fleets) */}
-      {tooltip && (tooltip.base || tooltip.country || tooltip.fleet) && (
-        <div
-          className="atlas-panel-brass fixed z-40 pointer-events-none rounded-xl p-2.5 text-xs max-w-[300px] shadow-2xl"
-          style={{
-            left: Math.min(window.innerWidth - 312, tooltip.x + 14),
-            top: Math.min(window.innerHeight - 195, tooltip.y + 14),
-          }}
-        >
-          {tooltip.base ? (
-            <div className="space-y-1">
-              <div className="flex items-start justify-between gap-2">
-                <span className="font-display font-bold text-[12.5px] leading-snug" style={{ color: 'var(--brass-bright)' }}>
-                  {tooltip.base.name}
-                </span>
-                <span className="text-[9.5px] font-mono-num px-1.5 py-0.5 rounded bg-[var(--brass-soft)] shrink-0">
-                  {tooltip.base.cocom}
-                </span>
-              </div>
-              <div className="text-[10.5px] opacity-80">
-                {localizeGlobalCountry(tooltip.base.country, locale)}
-                {tooltip.base.city ? ` · ${tooltip.base.city}` : ''} · {localizeGlobalRegion(tooltip.base.region, locale)}
-              </div>
-              <div className="flex items-center gap-1.5 text-[10.5px] pt-0.5">
-                <span
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ background: GLOBAL_BRANCH_COLORS[tooltip.base.branch] ?? '#999' }}
-                />
-                <span>{localizeGlobalComponent(tooltip.base.component, locale)}</span>
-                {tooltip.base.approx_coord && (
-                  <span className="text-[9px] px-1 rounded bg-amber-500/20 text-amber-300">
-                    {L('近似坐标', 'Approx.')}
-                  </span>
-                )}
-              </div>
-              <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-[var(--border-hairline)] text-[10px] font-mono-num">
-                <div>
-                  <div className="opacity-55">{L('设施估值', 'PRV')}</div>
-                  <div className="font-bold">
-                    {tooltip.base.prv_musd > 0 ? fmtMoney3(tooltip.base.prv_musd * 1e6) : '–'}
+      {/* Full-Detail Hover Dossier Card (Bases, Host Countries & Navy Fleets) */}
+      {tooltip && (tooltip.base || tooltip.country || tooltip.fleet) && (() => {
+        const vw = typeof window !== 'undefined' ? window.innerWidth : 1440;
+        const vh = typeof window !== 'undefined' ? window.innerHeight : 900;
+        const isBaseCard = !!tooltip.base;
+        const isCountryCard = !!tooltip.country;
+        const cardW = isBaseCard ? 364 : isCountryCard ? 336 : 290;
+        const estH = isBaseCard ? 345 : isCountryCard ? 280 : 120;
+        let left = tooltip.fromList
+          ? Math.min(vw - cardW - 14, (drawerOpen ? 466 : 16))
+          : tooltip.x + 18;
+        if (!tooltip.fromList && left + cardW > vw - 12) {
+          left = Math.max(12, tooltip.x - cardW - 18);
+        }
+        const top = tooltip.fromList
+          ? 58
+          : Math.max(54, Math.min(vh - estH - 14, tooltip.y - 24));
+
+        const b = tooltip.base;
+        const bHost = b ? countryByName.get(b.country) : undefined;
+        const bRank = b ? baseRankById.get(b.id) : undefined;
+        const bGlyph = b
+          ? (b.branch === 'air_force' ? '▲' : b.branch === 'navy' ? '◆' : b.branch === 'marines' ? '⛨' : b.branch === 'reserve_guard' ? '⬢' : '★')
+          : '';
+        const bTierLabel = b
+          ? (b.tier === 'hub'
+              ? L('核心战略枢纽', 'Strategic Hub')
+              : b.tier === 'major'
+                ? L('主力基地', 'Major Base')
+                : L('军事站点', 'Installation'))
+          : '';
+        const bPrvShare = b && bHost && bHost.prv_musd > 0 && b.prv_musd > 0
+          ? `${((b.prv_musd / bHost.prv_musd) * 100).toFixed(1)}%`
+          : null;
+
+        const c = tooltip.country;
+        const cTopBases = c ? (topBasesByCountry.get(c.name) ?? []).slice(0, 3) : [];
+
+        return (
+          <div
+            className="atlas-panel-brass fixed z-40 pointer-events-none rounded-xl p-3 text-xs shadow-2xl"
+            style={{ left, top, width: cardW }}
+          >
+            {b ? (
+              <div className="space-y-2">
+                {/* Header & Badges */}
+                <div className="space-y-0.5">
+                  <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[9.5px] font-mono-num font-bold px-1.5 py-0.5 rounded bg-[var(--brass-soft)]" style={{ color: 'var(--brass-bright)' }}>
+                        {b.cocom}
+                      </span>
+                      <span className="text-[9.5px] px-1.5 py-0.5 rounded border border-[var(--border-hairline)] opacity-85">
+                        {bTierLabel}
+                      </span>
+                      {b.approx_coord && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold">
+                          {L('近似坐标', 'Approx. Coord')}
+                        </span>
+                      )}
+                    </div>
+                    {bRank != null && b.prv_musd > 0 && (
+                      <span className="text-[9.5px] font-mono-num opacity-70">
+                        {L(`海外估值 #${bRank}/${s.total_bases}`, `Overseas #${bRank}/${s.total_bases}`)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="font-display font-bold text-[14px] leading-snug pt-0.5" style={{ color: 'var(--brass-bright)' }}>
+                    {b.name}
+                  </div>
+                  <div className="text-[11px] opacity-85 flex items-center flex-wrap gap-x-1.5 gap-y-0.5">
+                    <span className="font-semibold">{localizeGlobalCountry(b.country, locale)}</span>
+                    {!isEn && localizeGlobalCountry(b.country, locale) !== b.country && (
+                      <span className="opacity-55 text-[10px]">({b.country})</span>
+                    )}
+                    {b.city && <span>· {b.city}</span>}
+                    <span className="opacity-70">· {localizeGlobalRegion(b.region, locale)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] pt-0.5">
+                    <span style={{ color: GLOBAL_BRANCH_COLORS[b.branch] ?? '#999' }}>{bGlyph}</span>
+                    <span className="font-semibold">{localizeGlobalComponent(b.component, locale)}</span>
+                    <span className="opacity-50">·</span>
+                    <span className="opacity-75">{localizeGlobalBranch(b.branch, locale)}</span>
                   </div>
                 </div>
-                <div>
-                  <div className="opacity-55">{L('占地', 'Acres')}</div>
-                  <div className="font-bold">{tooltip.base.acres > 0 ? `${fmtCount3(tooltip.base.acres)} ac` : '–'}</div>
+
+                {/* 6-Field Complete DoD FY2024 BSR Infrastructure Grid */}
+                <div className="grid grid-cols-3 gap-1.5 pt-1.5 border-t border-[var(--border-hairline)] text-[10.5px] font-mono-num">
+                  <div className="p-1.5 rounded-lg bg-[var(--surface-paper-subtle)] border border-[var(--border-hairline)]">
+                    <div className="text-[9px] opacity-60 font-sans">{L('设施重置估值 PRV', 'Plant Value (PRV)')}</div>
+                    <div className="font-bold text-[12px]" style={{ color: '#E8C574' }}>
+                      {b.prv_musd > 0 ? fmtMoney3(b.prv_musd * 1e6) : '–'}
+                    </div>
+                    <div className="text-[9px] opacity-60 font-sans">
+                      {bPrvShare ? L(`占该地 ${bPrvShare}`, `${bPrvShare} of host`) : 'DoD FY24 BSR'}
+                    </div>
+                  </div>
+                  <div className="p-1.5 rounded-lg bg-[var(--surface-paper-subtle)] border border-[var(--border-hairline)]">
+                    <div className="text-[9px] opacity-60 font-sans">{L('占地面积', 'Land Area')}</div>
+                    <div className="font-bold text-[12px]">
+                      {b.acres > 0 ? `${fmtCount3(b.acres)} ac` : '–'}
+                    </div>
+                    <div className="text-[9px] opacity-60">
+                      {b.acres > 0 ? `${(b.acres * 0.004047).toFixed(b.acres >= 250 ? 1 : 2)} km²` : L('未单列/合署', 'Not listed')}
+                    </div>
+                  </div>
+                  <div className="p-1.5 rounded-lg bg-[var(--surface-paper-subtle)] border border-[var(--border-hairline)]">
+                    <div className="text-[9px] opacity-60 font-sans">{L('建筑规模', 'Buildings')}</div>
+                    <div className="font-bold text-[12px]">
+                      {b.buildings > 0 ? `${b.buildings.toLocaleString()}${L(' 栋', '')}` : '–'}
+                    </div>
+                    <div className="text-[9px] opacity-60">
+                      {b.sqft && b.sqft > 0
+                        ? `${(b.sqft / 1e6).toFixed(2)}M ft²`
+                        : L('无建筑面积', 'No sqft')}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="opacity-55">{L('建筑数', 'Bldgs')}</div>
-                  <div className="font-bold">{tooltip.base.buildings > 0 ? tooltip.base.buildings.toLocaleString() : '–'}</div>
+
+                {/* Building Ownership, Metric Floor Area & Dual-Format Coordinates */}
+                <div className="space-y-1 text-[10px] pt-1 border-t border-[var(--border-hairline)]">
+                  <div className="flex items-center justify-between gap-2 font-mono-num">
+                    <span className="opacity-70 font-sans">{L('建筑权属与面积：', 'Ownership & Area:')}</span>
+                    <span>
+                      {L(`自有 ${(b.bldgs_owned ?? 0).toLocaleString()} · 租用 ${(b.bldgs_leased ?? 0).toLocaleString()}`, `Owned ${(b.bldgs_owned ?? 0).toLocaleString()} · Leased ${(b.bldgs_leased ?? 0).toLocaleString()}`)}
+                      {b.sqft && b.sqft > 0
+                        ? (() => {
+                            const sqm = b.sqft * 0.092903;
+                            if (!isEn) return ` · ${(sqm / 1e4).toFixed(1)}万 m²`;
+                            return sqm >= 1e6 ? ` · ${(sqm / 1e6).toFixed(2)}M m²` : ` · ${Math.round(sqm / 1e3).toLocaleString()}K m²`;
+                          })()
+                        : ''}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 font-mono-num">
+                    <span className="opacity-70 font-sans">{L('地理坐标：', 'Coordinates:')}</span>
+                    <span>
+                      {fmtDms(b.lat, 'N', 'S')}, {fmtDms(b.lon, 'E', 'W')} ({b.lat.toFixed(3)}, {b.lon.toFixed(3)})
+                    </span>
+                  </div>
+                </div>
+
+                {/* Facility Note / Coordinate Audit Note */}
+                {b.note && (
+                  <div className="text-[10px] leading-snug px-2 py-1 rounded-md bg-[var(--surface-paper-subtle)] border border-[var(--border-hairline)] opacity-85 italic">
+                    {L('说明：', 'Note: ')}{b.note}
+                  </div>
+                )}
+
+                {/* Host Nation DMDC Garrison Context */}
+                {bHost && (
+                  <div className="space-y-1.5 pt-1.5 border-t border-[var(--border-hairline)]">
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="font-semibold opacity-80">
+                        {L(`${localizeGlobalCountry(bHost.name, locale, true)} 整体美军部署（DMDC）`, `${localizeGlobalCountry(bHost.name, locale, true)} Total U.S. Presence`)}
+                      </span>
+                      <span className="font-mono-num opacity-75">
+                        {L(`现役 ${bHost.active.toLocaleString()} · ${bHost.base_count} 座基地`, `${bHost.active.toLocaleString()} active · ${bHost.base_count} bases`)}
+                      </span>
+                    </div>
+                    {bHost.active > 0 && (
+                      <ShareBar
+                        segments={[
+                          { key: 'army', label: L('陆军', 'Army'), value: bHost.by_branch.army, color: '#7D9A46' },
+                          { key: 'navy', label: L('海军', 'Navy'), value: bHost.by_branch.navy, color: '#387EE0' },
+                          { key: 'marines', label: L('陆战队', 'USMC'), value: bHost.by_branch.marines, color: '#D9574B' },
+                          { key: 'air_force', label: L('空军', 'Air Force'), value: bHost.by_branch.air_force, color: '#5CB4EC' },
+                          { key: 'space_force', label: L('太空军', 'Space'), value: bHost.by_branch.space_force, color: '#9C82D8' },
+                          { key: 'coast_guard', label: L('海警', 'USCG'), value: bHost.by_branch.coast_guard, color: '#D6B04A' },
+                        ].filter((seg) => seg.value > 0)}
+                      />
+                    )}
+                    <div className="flex items-center justify-between text-[9.5px] opacity-65 font-mono-num">
+                      <span>{L(`文职 ${bHost.civilian.toLocaleString()} · 预备役 ${bHost.reserve.toLocaleString()}`, `Civ ${bHost.civilian.toLocaleString()} · Res ${bHost.reserve.toLocaleString()}`)}</span>
+                      <span>{L('点击锁定并飞往基地 →', 'Click to lock & zoom →')}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : c ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <div className="font-display font-bold text-[13.5px]" style={{ color: 'var(--brass-bright)' }}>
+                      {localizeGlobalCountry(c.name, locale)}
+                      {!isEn && localizeGlobalCountry(c.name, locale) !== c.name && (
+                        <span className="text-[10.5px] font-normal opacity-55 ml-1.5">{c.name}</span>
+                      )}
+                    </div>
+                    <div className="text-[10.5px] opacity-80">
+                      {localizeGlobalRegion(c.region, locale)}
+                      {c.presence_type === 'deployed_mission'
+                        ? ` · ${isEn ? c.mission_note_en : c.mission_note_zh}`
+                        : ''}
+                    </div>
+                  </div>
+                  <span className="text-[9.5px] font-mono-num px-1.5 py-0.5 rounded bg-[var(--brass-soft)] shrink-0">
+                    {c.cocom}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 pt-1.5 border-t border-[var(--border-hairline)] text-[10px] font-mono-num">
+                  <div>
+                    <div className="opacity-55 font-sans">{L('现役军人', 'Active Duty')}</div>
+                    <div className="font-bold text-[12px] text-[#6FB3E0]">{c.active.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="opacity-55 font-sans">{L('实体基地', 'BSR Bases')}</div>
+                    <div className="font-bold text-[12px] text-[#E8C574]">{c.base_count}</div>
+                  </div>
+                  <div>
+                    <div className="opacity-55 font-sans">{L('设施总估值', 'Total PRV')}</div>
+                    <div className="font-bold text-[12px] text-[#8DC48B]">{c.prv_musd > 0 ? fmtMoney3(c.prv_musd * 1e6) : '–'}</div>
+                  </div>
+                </div>
+                {c.active > 0 && (
+                  <div className="space-y-1">
+                    <ShareBar
+                      showLegend
+                      segments={[
+                        { key: 'army', label: L('陆军', 'Army'), value: c.by_branch.army, color: '#7D9A46', valueText: c.by_branch.army.toLocaleString() },
+                        { key: 'navy', label: L('海军', 'Navy'), value: c.by_branch.navy, color: '#387EE0', valueText: c.by_branch.navy.toLocaleString() },
+                        { key: 'marines', label: L('陆战队', 'USMC'), value: c.by_branch.marines, color: '#D9574B', valueText: c.by_branch.marines.toLocaleString() },
+                        { key: 'air_force', label: L('空军', 'Air Force'), value: c.by_branch.air_force, color: '#5CB4EC', valueText: c.by_branch.air_force.toLocaleString() },
+                        { key: 'space_force', label: L('太空军', 'Space'), value: c.by_branch.space_force, color: '#9C82D8', valueText: c.by_branch.space_force.toLocaleString() },
+                        { key: 'coast_guard', label: L('海警', 'USCG'), value: c.by_branch.coast_guard, color: '#D6B04A', valueText: c.by_branch.coast_guard.toLocaleString() },
+                      ].filter((seg) => seg.value > 0)}
+                    />
+                  </div>
+                )}
+                {cTopBases.length > 0 && (
+                  <div className="pt-1 border-t border-[var(--border-hairline)] space-y-0.5 text-[10px]">
+                    <div className="opacity-65">{L('旗舰基地（按 PRV）：', 'Flagship Bases (by PRV):')}</div>
+                    {cTopBases.map((tb) => (
+                      <div key={tb.id} className="flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-1 truncate">
+                          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: GLOBAL_BRANCH_COLORS[tb.branch] }} />
+                          <span className="truncate">{tb.name}</span>
+                        </span>
+                        <span className="font-mono-num opacity-80 shrink-0">
+                          {tb.prv_musd > 0 ? fmtMoney3(tb.prv_musd * 1e6) : '–'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="text-[9.5px] opacity-60 font-mono-num flex justify-between">
+                  <span>{L(`文职 ${c.civilian.toLocaleString()} · 预备役 ${c.reserve.toLocaleString()}`, `Civ ${c.civilian.toLocaleString()} · Res ${c.reserve.toLocaleString()}`)}</span>
+                  <span>{L('点击展开全部基地 →', 'Click for full roster →')}</span>
                 </div>
               </div>
-              <div className="text-[9.5px] opacity-60 font-mono-num">
-                {fmtDms(tooltip.base.lat, 'N', 'S')} · {fmtDms(tooltip.base.lon, 'E', 'W')} · {L('点击展开详情', 'Click for details')}
-              </div>
-            </div>
-          ) : tooltip.country ? (
-            <div className="space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-display font-bold text-[12.5px]" style={{ color: 'var(--brass-bright)' }}>
-                  {localizeGlobalCountry(tooltip.country.name, locale)}
-                </span>
-                <span className="text-[9.5px] font-mono-num px-1.5 py-0.5 rounded bg-[var(--brass-soft)]">
-                  {tooltip.country.cocom}
-                </span>
-              </div>
-              <div className="text-[10.5px] opacity-80">
-                {localizeGlobalRegion(tooltip.country.region, locale)}
-                {tooltip.country.presence_type === 'deployed_mission'
-                  ? ` · ${isEn ? tooltip.country.mission_note_en : tooltip.country.mission_note_zh}`
-                  : ''}
-              </div>
-              <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-[var(--border-hairline)] text-[10px] font-mono-num">
-                <div>
-                  <div className="opacity-55">{L('现役兵力', 'Active')}</div>
-                  <div className="font-bold">{tooltip.country.active.toLocaleString()}</div>
+            ) : tooltip.fleet ? (
+              <div className="space-y-1">
+                <div className="font-display font-bold text-[12.5px]" style={{ color: '#8DCBFF' }}>
+                  ⚓ {isEn ? tooltip.fleet.name_en : tooltip.fleet.name_zh}
                 </div>
-                <div>
-                  <div className="opacity-55">{L('实体基地', 'Bases')}</div>
-                  <div className="font-bold">{tooltip.country.base_count}</div>
+                <div className="text-[10.5px] opacity-85">
+                  {isEn ? tooltip.fleet.hq_en : tooltip.fleet.hq_zh}
                 </div>
-                <div>
-                  <div className="opacity-55">{L('文职/预备', 'Civ+Res')}</div>
-                  <div className="font-bold">{(tooltip.country.civilian + tooltip.country.reserve).toLocaleString()}</div>
+                <div className="text-[9.5px] opacity-60">
+                  {L(`隶属 ${tooltip.fleet.cocom} · 点击聚焦战区`, `${tooltip.fleet.cocom} AOR · Click to zoom theater`)}
                 </div>
               </div>
-            </div>
-          ) : tooltip.fleet ? (
-            <div className="space-y-1">
-              <div className="font-display font-bold text-[12px]" style={{ color: '#8DCBFF' }}>
-                ⚓ {isEn ? tooltip.fleet.name_en : tooltip.fleet.name_zh}
-              </div>
-              <div className="text-[10.5px] opacity-85">
-                {isEn ? tooltip.fleet.hq_en : tooltip.fleet.hq_zh}
-              </div>
-              <div className="text-[9.5px] opacity-60">
-                {L(`隶属 ${tooltip.fleet.cocom} · 点击聚焦战区`, `${tooltip.fleet.cocom} AOR · Click to zoom theater`)}
-              </div>
-            </div>
-          ) : null}
-        </div>
-      )}
+            ) : null}
+          </div>
+        );
+      })()}
 
       {/* Left Docked Global Command Drawer */}
       {drawerOpen ? (
@@ -1124,7 +1341,10 @@ export const GlobalMilitaryView: React.FC<GlobalMilitaryViewProps> = ({
                       render: (r) => (r.b.acres > 0 ? fmtCount3(r.b.acres) : '–'),
                     },
                   ]}
-                  onHover={(r) => setHoveredBaseId(r ? r.id : null)}
+                  onHover={(r) => {
+                    setHoveredBaseId(r ? r.id : null);
+                    setTooltip(r ? { x: 0, y: 0, fromList: true, base: r.b } : null);
+                  }}
                   onClick={(r) => {
                     setSelectedBaseId(r.id);
                     setSelectedCountryName(null);
@@ -1173,7 +1393,10 @@ export const GlobalMilitaryView: React.FC<GlobalMilitaryViewProps> = ({
                       render: (r) => (r.c.prv_musd > 0 ? fmtMoney3(r.c.prv_musd * 1e6) : '–'),
                     },
                   ]}
-                  onHover={(r) => setHoveredCountryName(r ? r.id : null)}
+                  onHover={(r) => {
+                    setHoveredCountryName(r ? r.id : null);
+                    setTooltip(r ? { x: 0, y: 0, fromList: true, country: r.c } : null);
+                  }}
                   onClick={(r) => {
                     setSelectedCountryName(r.id);
                     setSelectedBaseId(null);

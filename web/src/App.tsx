@@ -245,6 +245,17 @@ export default function App() {
     return m;
   }, [countiesData]);
   const stateByFips = useMemo(() => new Map(states.map((s) => [s.fips, s])), [states]);
+  const stateByAbbr = useMemo(() => new Map(states.map((s) => [s.abbr, s])), [states]);
+  const cityById = useMemo(() => new Map(cities.map((c) => [c.id, c])), [cities]);
+  const rangeByHexId = useMemo(() => {
+    const m = new Map<number, NonNullable<MapLayersData['military_ranges']>[number]>();
+    if (layersData?.military_ranges) {
+      for (const rg of layersData.military_ranges) {
+        for (const hid of rg.cells) m.set(hid, rg);
+      }
+    }
+    return m;
+  }, [layersData]);
 
   const showdownCities = useMemo<[CityRecord | null, CityRecord | null]>(() => {
     if (mode !== 'showdown' || showdownKind !== 'city') return [null, null];
@@ -885,6 +896,9 @@ export default function App() {
           activeLens={activeLens}
           countyByFips={countyByFips}
           stateByFips={stateByFips}
+          stateByAbbr={stateByAbbr}
+          cityById={cityById}
+          rangeByHexId={rangeByHexId}
         />
       )}
 

@@ -231,8 +231,10 @@ export class GlobalMapCamera {
 
 export interface GlobalHitResult {
   bases: { base: GlobalBaseRecord; sx: number; sy: number; r: number }[];
+  basePlaques: { base: GlobalBaseRecord; x0: number; y0: number; x1: number; y1: number }[];
   countries: { country: GlobalCountryRecord; sx: number; sy: number; r: number }[];
-  fleets: { fleet: NavyFleetRecord; sx: number; sy: number; r: number }[];
+  countryPlaques: { country: GlobalCountryRecord; x0: number; y0: number; x1: number; y1: number }[];
+  fleets: { fleet: NavyFleetRecord; sx: number; sy: number; r: number; x0: number; y0: number; x1: number; y1: number }[];
 }
 
 export interface GlobalRenderOptions {
@@ -487,7 +489,9 @@ export function renderGlobalMilitaryChart(ctx: CanvasRenderingContext2D, opts: G
   const { width: w, height: h, scale } = camera;
   const isMid = theme === 'midnight';
   const baseHits: GlobalHitResult['bases'] = [];
+  const basePlaques: GlobalHitResult['basePlaques'] = [];
   const countryHits: GlobalHitResult['countries'] = [];
+  const countryPlaques: GlobalHitResult['countryPlaques'] = [];
   const fleetHits: GlobalHitResult['fleets'] = [];
 
   // 1. Rich engraved deep-ocean vignette
@@ -828,7 +832,7 @@ export function renderGlobalMilitaryChart(ctx: CanvasRenderingContext2D, opts: G
       ctx.fillText(txt, sx, sy + 0.5);
 
       placedLabels.push({ x0: x0 - 2, y0: y0 - 2, x1: x0 + bw + 2, y1: y0 + bh + 2 });
-      fleetHits.push({ fleet: fl, sx, sy, r: Math.max(16, bw * 0.45) });
+      fleetHits.push({ fleet: fl, sx, sy, r: Math.max(16, bw * 0.45), x0, y0, x1: x0 + bw, y1: y0 + bh });
     }
     ctx.restore();
   }
@@ -949,10 +953,15 @@ export function renderGlobalMilitaryChart(ctx: CanvasRenderingContext2D, opts: G
           const slot = findPlaqueSlot(sx, sy, totalW, bh, 8, preferLeft);
           if (!slot) continue;
           const [x0, y0] = slot;
+          const isCountryHi = c.name === hoveredCountryName || c.name === selectedCountryName;
 
           ctx.fillStyle = isMid ? 'rgba(13, 22, 34, 0.90)' : 'rgba(248, 243, 232, 0.94)';
-          ctx.strokeStyle = isMid ? 'rgba(214, 178, 98, 0.65)' : 'rgba(92, 72, 36, 0.50)';
-          ctx.lineWidth = 0.9;
+          ctx.strokeStyle = isCountryHi
+            ? '#FFE58F'
+            : isMid
+              ? 'rgba(214, 178, 98, 0.65)'
+              : 'rgba(92, 72, 36, 0.50)';
+          ctx.lineWidth = isCountryHi ? 1.5 : 0.9;
           ctx.beginPath();
           ctx.roundRect(x0, y0, totalW, bh, 4);
           ctx.fill();
@@ -973,6 +982,8 @@ export function renderGlobalMilitaryChart(ctx: CanvasRenderingContext2D, opts: G
           ctx.font = '700 9px "Inter", "PingFang SC", sans-serif';
           ctx.textAlign = 'left';
           ctx.fillText(cname, x0 + bw1 + 5, y0 + bh / 2 + 0.5);
+
+          countryPlaques.push({ country: c, x0, y0, x1: x0 + totalW, y1: y0 + bh });
         }
       }
 
@@ -983,7 +994,7 @@ export function renderGlobalMilitaryChart(ctx: CanvasRenderingContext2D, opts: G
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
       for (const b of basesByPrv) {
-        if (b.id === hoveredBaseId || b.id === selectedBaseId) continue;
+        if (b.id === selectedBaseId && b.id !== hoveredBaseId) continue;
         if (scale < 6.0 && b.tier !== 'hub') continue;
         if (scale < 12.0 && b.tier === 'site') continue;
         const [sx, sy] = camera.lonLatToScreen(b.lon, b.lat);
@@ -1004,10 +1015,15 @@ export function renderGlobalMilitaryChart(ctx: CanvasRenderingContext2D, opts: G
         const slot = findPlaqueSlot(sx, sy, bw, bh, 9, false);
         if (!slot) continue;
         const [x0, y0] = slot;
+        const isBaseHi = b.id === hoveredBaseId || b.id === selectedBaseId;
 
-        ctx.fillStyle = isMid ? 'rgba(12, 22, 34, 0.84)' : 'rgba(248, 243, 232, 0.90)';
-        ctx.strokeStyle = isMid ? 'rgba(209, 173, 94, 0.45)' : 'rgba(92, 74, 42, 0.36)';
-        ctx.lineWidth = 0.8;
+        ctx.fillStyle = isBaseHi
+          ? (isMid ? 'rgba(20, 34, 52, 0.96)' : 'rgba(255, 250, 236, 0.98)')
+          : (isMid ? 'rgba(12, 22, 34, 0.84)' : 'rgba(248, 243, 232, 0.90)');
+        ctx.strokeStyle = isBaseHi
+          ? '#F2C96B'
+          : (isMid ? 'rgba(209, 173, 94, 0.45)' : 'rgba(92, 74, 42, 0.36)');
+        ctx.lineWidth = isBaseHi ? 1.4 : 0.8;
         ctx.beginPath();
         ctx.roundRect(x0, y0, bw, bh, 3.5);
         ctx.fill();
@@ -1019,48 +1035,52 @@ export function renderGlobalMilitaryChart(ctx: CanvasRenderingContext2D, opts: G
         ctx.arc(x0 + 5.5, y0 + bh / 2, 2.3, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = isMid ? '#F2E7C9' : '#23201A';
+        ctx.fillStyle = isBaseHi ? (isMid ? '#FFF4D2' : '#1A140B') : (isMid ? '#F2E7C9' : '#23201A');
         ctx.fillText(txt, x0 + 10, y0 + bh / 2 + 0.5);
+
+        basePlaques.push({ base: b, x0, y0, x1: x0 + bw, y1: y0 + bh });
       }
       ctx.restore();
     }
 
-    // Highlighted / Selected base drawn on top with golden halo & rich callout pill
+    // Highlighted / Selected base drawn on top with golden halo (pill shown when selected & not hovered)
     if (highlightBase) {
       const [sx, sy] = camera.lonLatToScreen(highlightBase.lon, highlightBase.lat);
       const col = GLOBAL_BRANCH_COLORS[highlightBase.branch] ?? '#F2C96B';
       drawBranchMarker(ctx, sx, sy, 9.8, highlightBase.branch, col, '#FFF8DC', true);
       baseHits.push({ base: highlightBase, sx, sy, r: 15 });
 
-      const cLoc = localizeGlobalCountry(highlightBase.country, locale, true);
-      const sub = highlightBase.prv_musd >= 1000
-        ? `$${(highlightBase.prv_musd / 1000).toFixed(1)}B`
-        : highlightBase.prv_musd > 0
-          ? `$${highlightBase.prv_musd.toFixed(0)}M`
-          : cLoc;
-      const pill = `${highlightBase.name} · ${cLoc} · ${sub}`;
-      ctx.save();
-      ctx.font = '700 11px "Inter", "PingFang SC", sans-serif';
-      const tw = ctx.measureText(pill).width;
-      const px = Math.max(tw / 2 + 12, Math.min(w - tw / 2 - 12, sx));
-      const py = Math.max(40, sy - 23);
-      ctx.fillStyle = 'rgba(12, 20, 32, 0.96)';
-      ctx.strokeStyle = '#F2C96B';
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.roundRect(px - tw / 2 - 10, py - 10.5, tw + 20, 21, 6);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = '#FFF8E2';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(pill, px, py + 0.5);
-      ctx.restore();
+      if (highlightBase.id === selectedBaseId && highlightBase.id !== hoveredBaseId) {
+        const cLoc = localizeGlobalCountry(highlightBase.country, locale, true);
+        const sub = highlightBase.prv_musd >= 1000
+          ? `$${(highlightBase.prv_musd / 1000).toFixed(1)}B`
+          : highlightBase.prv_musd > 0
+            ? `$${highlightBase.prv_musd.toFixed(0)}M`
+            : cLoc;
+        const pill = `${highlightBase.name} · ${cLoc} · ${sub}`;
+        ctx.save();
+        ctx.font = '700 11px "Inter", "PingFang SC", sans-serif';
+        const tw = ctx.measureText(pill).width;
+        const px = Math.max(tw / 2 + 12, Math.min(w - tw / 2 - 12, sx));
+        const py = Math.max(40, sy - 23);
+        ctx.fillStyle = 'rgba(12, 20, 32, 0.96)';
+        ctx.strokeStyle = '#F2C96B';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.roundRect(px - tw / 2 - 10, py - 10.5, tw + 20, 21, 6);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#FFF8E2';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(pill, px, py + 0.5);
+        ctx.restore();
+      }
     }
   }
 
   // 15. Classical Brass Compass Rose in upper-right ocean margin
   drawCompassRose(ctx, w - 42, 46, isMid);
 
-  return { bases: baseHits, countries: countryHits, fleets: fleetHits };
+  return { bases: baseHits, basePlaques, countries: countryHits, countryPlaques, fleets: fleetHits };
 }
