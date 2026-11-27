@@ -3,18 +3,21 @@ import type { PickedItem } from '../engine/picking';
 import { formatMetric } from '../features/lenses/lensConfig';
 import {
   BIOME_NAMES_L10N,
+  localizeCommodity,
   localizeFuelLabel,
   localizeLensCategory,
   localizeLensName,
   localizeMilComponent,
   localizeMineLabel,
   localizeMineMetric,
+  localizeTradeMode,
   localizeWonderExtra,
   localizeWonderMetric,
   localizeWonderRule,
   RELIEF_NAMES_L10N,
   useL,
 } from '../i18n';
+import { TRADE_MODE_STYLE } from '../engine/sprites/proceduralSprites';
 import type { CountyRow, LensMeta, StateRecord, WorldHexData } from '../types/world';
 
 interface MapTooltipProps {
@@ -39,14 +42,16 @@ export const MapTooltip: React.FC<MapTooltipProps> = ({
   const { locale, L } = useL();
   if (!picked) return null;
 
-  const left = Math.min(window.innerWidth - 280, x + 16);
-  const top = Math.min(window.innerHeight - 190, y + 16);
+  const isRoute = picked.kind === 'route';
+  const boxW = isRoute ? 296 : 256;
+  const left = Math.min(window.innerWidth - (boxW + 18), x + 16);
+  const top = Math.min(window.innerHeight - (isRoute ? 235 : 190), y + 16);
   const biomeNames = BIOME_NAMES_L10N[locale];
   const reliefNames = RELIEF_NAMES_L10N[locale];
 
   return (
     <div
-      className="atlas-panel-brass fixed z-40 pointer-events-none rounded-xl px-3 py-2.5 w-64 text-xs"
+      className={`atlas-panel-brass fixed z-40 pointer-events-none rounded-xl px-3 py-2.5 text-xs ${isRoute ? 'w-[296px]' : 'w-64'}`}
       style={{ left: Math.max(10, left), top: Math.max(60, top) }}
     >
       {picked.kind === 'city' && (
@@ -146,6 +151,90 @@ export const MapTooltip: React.FC<MapTooltipProps> = ({
           <div className="text-[11px] opacity-80">{localizeMilComponent(picked.base.component, locale)} · {picked.base.state}</div>
         </div>
       )}
+
+      {picked.kind === 'route' && (() => {
+        const r = picked.route;
+        const valUsd = (r.value_musd || 0) * 1e6;
+        const valFmt =
+          valUsd >= 1e9
+            ? `$${(valUsd / 1e9).toFixed(valUsd >= 1e10 ? 1 : 2)}${L('B', 'B')}`
+            : `$${(valUsd / 1e6).toFixed(1)}M`;
+        const tons = (r.tons_k || 0) * 1e3;
+        const tonsFmt =
+          tons >= 1e6
+            ? `${(tons / 1e6).toFixed(1)}M`
+            : tons >= 1e3
+              ? `${Math.round(tons / 1e3)}K`
+              : String(Math.round(tons));
+        const modeEntries = Object.entries(r.modes || {})
+          .filter(([, v]) => v >= 0.05)
+          .sort((a, b) => b[1] - a[1]);
+        const modeStyle = TRADE_MODE_STYLE[r.top_mode] ?? TRADE_MODE_STYLE.other;
+
+        return (
+          <div className="space-y-1.5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="font-display text-sm font-bold leading-tight">
+                {r.orig_st} <span style={{ color: 'var(--brass-bright)' }}>⇄</span> {r.dest_st}
+              </div>
+              {r.rank != null && (
+                <span
+                  className="text-[10px] font-mono-num px-1.5 py-0.5 rounded shrink-0 bg-[var(--brass-soft)] font-semibold"
+                  style={{ color: 'var(--brass-bright)' }}
+                >
+                  {L(`商路 #${r.rank}`, `Route #${r.rank}`)}
+                </span>
+              )}
+            </div>
+
+            {(r.orig_full || r.dest_full) && (
+              <div className="text-[10.5px] opacity-70 leading-snug">
+                {r.orig_full ?? r.orig_st} ⇄ {r.dest_full ?? r.dest_st}
+              </div>
+            )}
+
+            <div className="text-[11.5px] leading-snug pt-1 border-t border-[var(--border-hairline)]">
+              <b className="font-mono-num" style={{ color: 'var(--brass-bright)' }}>{valFmt}</b>{' '}
+              {L('年货运额 · ', 'of freight / yr · ')}
+              <b className="font-mono-num">{tonsFmt}</b> {L('短吨', 'short tons')}
+              {r.dist_km ? (
+                <span className="opacity-65 font-mono-num"> · {Math.round(r.dist_km).toLocaleString()} km</span>
+              ) : null}
+            </div>
+
+            {modeEntries.length > 0 && (
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px]">
+                {modeEntries.map(([mk, share]) => {
+                  const ms = TRADE_MODE_STYLE[mk] ?? TRADE_MODE_STYLE.other;
+                  return (
+                    <span key={mk} className="inline-flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full inline-block shrink-0" style={{ background: ms.color }} />
+                      <span>{localizeTradeMode(mk, locale)}</span>
+                      <b className="font-mono-num">{Math.round(share * 100)}%</b>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+
+            {r.top_commodity && (
+              <div className="text-[11px] flex items-center gap-1.5">
+                <span className="opacity-70">{L('首要货类：', 'Top commodity:')}</span>
+                <b style={{ color: modeStyle.color === '#3c3a38' ? 'var(--brass-bright)' : undefined }}>
+                  {localizeCommodity(r.top_commodity, locale)}
+                </b>
+              </div>
+            )}
+
+            <div className="text-[9.5px] opacity-60 leading-snug pt-1 border-t border-[var(--border-hairline)]">
+              {L(
+                '双向加总（FAF 5.7.1 估算）。弧线连接两货运区核心城市作为示意：FAF 记录起讫地而非实际行驶路线。',
+                "Both directions summed (FAF 5.7.1 estimate). Drawn as an arc between each zone's largest city: FAF records origin and destination, not its physical route.",
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {picked.kind === 'hex' && (() => {
         const i = picked.hexId;

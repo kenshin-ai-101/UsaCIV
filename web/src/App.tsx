@@ -9,6 +9,7 @@ import {
   type BannerHitBox,
   type PickedItem,
   type PointHitItem,
+  type RouteHitItem,
 } from './engine/picking';
 import { useAppStore } from './store/useAppStore';
 import { useL } from './i18n';
@@ -27,6 +28,7 @@ import type {
   CountiesDataset,
   MapLayersData,
   StateRecord,
+  TradeRouteNode,
   WorldHexData,
   WorldMeta,
 } from './types/world';
@@ -89,7 +91,12 @@ export default function App() {
   const cameraRef = useRef(new MapCamera());
   const rendererRef = useRef<HexRenderer | null>(null);
   const hexIndexRef = useRef<HexSpatialIndex | null>(null);
-  const hitStateRef = useRef<{ banners: BannerHitBox[]; points: PointHitItem[] }>({ banners: [], points: [] });
+  const hitStateRef = useRef<{ banners: BannerHitBox[]; points: PointHitItem[]; routes: RouteHitItem[] }>({
+    banners: [],
+    points: [],
+    routes: [],
+  });
+  const hoveredRouteRef = useRef<TradeRouteNode | null>(null);
   const dragRef = useRef<{ active: boolean; sx: number; sy: number; moved: boolean }>({
     active: false,
     sx: 0,
@@ -372,6 +379,7 @@ export default function App() {
             hasLens: activeLens !== null,
             selectedCity,
             hoveredHexId,
+            hoveredRoute: hoveredRouteRef.current,
             advisorFuelFilters,
             advisorBubbles,
             hoveredBubbleId,
@@ -616,10 +624,16 @@ export default function App() {
       hitStateRef.current.banners,
       hitStateRef.current.points,
       hexIndexRef.current,
+      hitStateRef.current.routes,
     );
     setHoverInfo({ x: e.clientX, y: e.clientY, picked });
     const nextHex = picked?.kind === 'hex' ? picked.hexId : -1;
     if (nextHex !== useAppStore.getState().hoveredHexId) setHoveredHex(nextHex);
+    const nextRoute = picked?.kind === 'route' ? picked.route : null;
+    if (nextRoute !== hoveredRouteRef.current) {
+      hoveredRouteRef.current = nextRoute;
+      requestDraw();
+    }
   };
 
   const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -662,6 +676,7 @@ export default function App() {
       hitStateRef.current.banners,
       hitStateRef.current.points,
       hexIndexRef.current,
+      hitStateRef.current.routes,
     );
     if (!picked) return;
 
@@ -674,7 +689,14 @@ export default function App() {
       else if (picked.kind === 'airport') flyTo(picked.airport.x, picked.airport.y, 1.4);
       else if (picked.kind === 'port') flyTo(picked.port.x, picked.port.y, 1.4);
       else if (picked.kind === 'military') flyTo(picked.base.x, picked.base.y, 1.4);
-      else if (picked.kind === 'hex') {
+      else if (picked.kind === 'route') {
+        const r = picked.route;
+        cameraRef.current.fitBounds(
+          [Math.min(r.ox, r.dx) - 160, Math.min(r.oy, r.dy) - 140, Math.max(r.ox, r.dx) + 160, Math.max(r.oy, r.dy) + 140],
+          { padLeft: 48, padRight: 48, padTop: 72, padBottom: 92, animate: true },
+        );
+        requestDraw();
+      } else if (picked.kind === 'hex') {
         const hid = picked.hexId;
         if (useAppStore.getState().mode === 'explorer') {
           const fips = world.fips[hid];
@@ -765,6 +787,10 @@ export default function App() {
           setHoverInfo((h) => ({ ...h, picked: null }));
           setHoveredHex(-1);
           setHoveredBubbleId(null);
+          if (hoveredRouteRef.current !== null) {
+            hoveredRouteRef.current = null;
+            requestDraw();
+          }
         }}
         onWheel={onWheel}
         className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing touch-none"

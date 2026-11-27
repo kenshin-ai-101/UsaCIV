@@ -24,6 +24,7 @@ import type {
   ShaleSiteNode,
   StateRecord,
   ThemeMode,
+  TradeRouteNode,
   WorldHexData,
   WorldMeta,
 } from '../../types/world';
@@ -39,7 +40,7 @@ import {
 import { localizeDistrictName } from '../../i18n';
 import type { MapCamera } from '../camera';
 import { getWorldTopology, HEX_CORNERS_WORLD, type WorldTopology } from '../hexTopology';
-import type { BannerHitBox, PointHitItem } from '../picking';
+import type { BannerHitBox, PointHitItem, RouteHitItem } from '../picking';
 import { HEX_DRAW_SCALE } from '../webgl/HexRenderer';
 import { drawCityTilesOverlay, drawPainterlyTerrain } from '../sprites/terrainArt';
 import {
@@ -68,6 +69,7 @@ export interface OverlayRenderContext {
   hasLens: boolean;
   selectedCity: CityRecord | null;
   hoveredHexId: number;
+  hoveredRoute?: TradeRouteNode | null;
   advisorFuelFilters: Set<string> | null;
   advisorBubbles: MapBubbleSpec[] | null;
   hoveredBubbleId: string | null;
@@ -77,6 +79,7 @@ export interface OverlayRenderContext {
 export interface OverlayHitResult {
   banners: BannerHitBox[];
   points: PointHitItem[];
+  routes: RouteHitItem[];
 }
 
 const TAU = Math.PI * 2;
@@ -649,6 +652,7 @@ export function renderMapOverlay(ctx: CanvasRenderingContext2D, rc: OverlayRende
     hasLens,
     selectedCity,
     hoveredHexId,
+    hoveredRoute,
     advisorFuelFilters,
     advisorBubbles,
     hoveredBubbleId,
@@ -663,6 +667,7 @@ export function renderMapOverlay(ctx: CanvasRenderingContext2D, rc: OverlayRende
   ctx.clearRect(0, 0, w, h);
   const banners: BannerHitBox[] = [];
   const points: PointHitItem[] = [];
+  const routeHits: RouteHitItem[] = [];
 
   const drawPolylineList = (lines: [number, number][][], stroke: string, lw: number, dash?: number[], cap: CanvasLineCap = 'round') => {
     ctx.save();
@@ -1008,12 +1013,13 @@ export function renderMapOverlay(ctx: CanvasRenderingContext2D, rc: OverlayRende
       }
     }
 
-    // Z-85: Mode-Colored Parchment-Haloed FAF5 Trade Routes + Midpoint Vehicle Medallions!
+    // Z-85: Mode-Colored Parchment-Haloed FAF5 Trade Routes + Spaced Vehicle Medallions + Hover Highlight & Hit Boxes!
     if (toggles.trade && layers.trade.routes.length > 0) {
       ctx.save();
       const routes = layers.trade.routes;
       const maxVal = Math.max(1, routes[0].value_musd || 1);
       const anchorSeen = new Map<string, number>();
+      const base = Math.max(1.4, Math.min(3.8, 1.3 + Rpx * 0.04));
 
       const prepared = routes.map((rt, idx) => {
         const [ax0, ay0] = camera.worldToScreen(rt.ox, rt.oy);
@@ -1035,27 +1041,84 @@ export function renderMapOverlay(ctx: CanvasRenderingContext2D, rc: OverlayRende
         const weight = Math.sqrt((rt.value_musd || 0) / maxVal);
         const top = idx < 10;
         const st = TRADE_MODE_STYLE[rt.top_mode] ?? TRADE_MODE_STYLE.other;
-        return { ax, ay, bx, by, qx, qy, dist, weight, top, st };
+        const wpx = base * (top ? 1.1 + 1.0 * weight : 0.55 + 0.5 * weight);
+
+        // Sample quadratic Bezier into 20 segments for accurate curve picking & multi-medallion spacing
+        const SEG = 20;
+        const pts: number[] = [];
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        let arcLen = 0;
+        let prevX = ax;
+        let prevY = ay;
+        for (let s = 0; s <= SEG; s++) {
+          const t = s / SEG;
+          const u = 1 - t;
+          const px = u * u * ax + 2 * u * t * qx + t * t * bx;
+          const py = u * u * ay + 2 * u * t * qy + t * t * by;
+          pts.push(px, py);
+          if (px < minX) minX = px;
+          if (px > maxX) maxX = px;
+          if (py < minY) minY = py;
+          if (py > maxY) maxY = py;
+          if (s > 0) arcLen += Math.hypot(px - prevX, py - prevY);
+          prevX = px;
+          prevY = py;
+        }
+        const markers: [number, number, number][] = [];
+        const markerSz = Math.max(11, Math.min(18, 10 + Rpx * 0.2)) * (top ? 1.02 : 0.78);
+        if (Rpx >= 8 || top) {
+          const nMk = Math.max(1, Math.min(4, Math.round(arcLen / 240)));
+          for (let m = 0; m < nMk; m++) {
+            const tm = (m + 0.5) / nMk;
+            const um = 1 - tm;
+            const mx = um * um * ax + 2 * um * tm * qx + tm * tm * bx;
+            const my = um * um * ay + 2 * um * tm * qy + tm * tm * by;
+            markers.push([mx, my, markerSz * 0.5]);
+          }
+        }
+        const isHovered = !!hoveredRoute && (hoveredRoute === rt || (hoveredRoute.rank != null && hoveredRoute.rank === rt.rank));
+        return { rt, ax, ay, bx, by, qx, qy, weight, top, st, wpx, pts, bbox: [minX, minY, maxX, maxY] as [number, number, number, number], markers, markerSz, isHovered };
       });
 
-      // Smallest routes first so Top 10 sit on top
-      ctx.lineJoin = 'round';
+      // Register hit boxes in priority order (Top 10 flagship corridors first)
+      for (const p of prepared) {
+        if (p.bbox[2] < -40 || p.bbox[0] > w + 40 || p.bbox[3] < -40 || p.bbox[1] > h + 40) continue;
+        routeHits.push({
+          route: p.rt,
+          pts: p.pts,
+          bbox: p.bbox,
+          tolPx: p.wpx * 0.75 + 5,
+          markers: p.markers,
+        });
+      }
+
+      const drawOrder: typeof prepared = [];
+      let hoveredPrep: (typeof prepared)[number] | null = null;
       for (let k = prepared.length - 1; k >= 0; k--) {
-        const p = prepared[k];
-        const base = Math.max(1.4, Math.min(3.8, 1.3 + Rpx * 0.04));
-        const wpx = base * (p.top ? 1.1 + 1.0 * p.weight : 0.55 + 0.5 * p.weight);
-        ctx.globalAlpha = p.top ? 1 : 0.72;
+        if (prepared[k].isHovered) hoveredPrep = prepared[k];
+        else drawOrder.push(prepared[k]);
+      }
+      if (hoveredPrep) drawOrder.push(hoveredPrep);
+
+      const hasHover = hoveredPrep !== null;
+      ctx.lineJoin = 'round';
+      for (const p of drawOrder) {
+        const wpx = p.isHovered ? p.wpx * 1.28 : p.wpx;
+        ctx.globalAlpha = hasHover ? (p.isHovered ? 1 : 0.26) : p.top ? 1 : 0.72;
         const path = new Path2D();
         path.moveTo(p.ax, p.ay);
         path.quadraticCurveTo(p.qx, p.qy, p.bx, p.by);
 
-        const halo = wpx * 1.5 + 2;
+        const halo = wpx * 1.5 + (p.isHovered ? 3.2 : 2);
         ctx.lineCap = 'round';
         ctx.setLineDash([]);
-        ctx.strokeStyle = 'rgba(30,20,8,.36)';
-        ctx.lineWidth = halo + 1.4;
+        ctx.strokeStyle = p.isHovered ? 'rgba(24,14,4,.58)' : 'rgba(30,20,8,.36)';
+        ctx.lineWidth = halo + 1.6;
         ctx.stroke(path);
-        ctx.strokeStyle = 'rgba(250,241,214,.92)';
+        ctx.strokeStyle = p.isHovered ? 'rgba(255,236,172,.98)' : 'rgba(250,241,214,.92)';
         ctx.lineWidth = halo;
         ctx.stroke(path);
 
@@ -1078,23 +1141,31 @@ export function renderMapOverlay(ctx: CanvasRenderingContext2D, rc: OverlayRende
       }
       ctx.globalAlpha = 1;
 
-      // Anchor studs + midpoint vehicle medallions
+      // Anchor studs + highlighted endpoint rings when a route is hovered
       ctx.fillStyle = '#f3e6c4';
       ctx.strokeStyle = 'rgba(18,12,6,.82)';
       ctx.lineWidth = 1;
-      for (const p of prepared) {
-        const sr = Math.max(2.4, Math.min(4.2, 2 + Rpx * 0.05));
+      for (const p of drawOrder) {
+        ctx.globalAlpha = hasHover ? (p.isHovered ? 1 : 0.35) : 1;
+        const sr = Math.max(2.4, Math.min(4.2, 2 + Rpx * 0.05)) * (p.isHovered ? 1.35 : 1);
         ctx.beginPath(); ctx.arc(p.ax, p.ay, sr, 0, TAU); ctx.fill(); ctx.stroke();
         ctx.beginPath(); ctx.arc(p.bx, p.by, sr, 0, TAU); ctx.fill(); ctx.stroke();
+        if (p.isHovered) {
+          ctx.save();
+          ctx.strokeStyle = '#f6d46b';
+          ctx.lineWidth = 2.2;
+          ctx.beginPath(); ctx.arc(p.ax, p.ay, sr + 4.5, 0, TAU); ctx.stroke();
+          ctx.beginPath(); ctx.arc(p.bx, p.by, sr + 4.5, 0, TAU); ctx.stroke();
+          ctx.restore();
+        }
       }
-      for (let k = prepared.length - 1; k >= 0; k--) {
-        const p = prepared[k];
-        if (Rpx < 8 && !p.top) continue;
-        const mx = 0.25 * p.ax + 0.5 * p.qx + 0.25 * p.bx;
-        const my = 0.25 * p.ay + 0.5 * p.qy + 0.25 * p.by;
-        const sz = Math.max(11, Math.min(18, 10 + Rpx * 0.2)) * (p.top ? 1.05 : 0.8);
-        ctx.globalAlpha = p.top ? 1 : 0.78;
-        drawTradeMarkerSprite(ctx, p.st.marker, mx, my, sz, p.st.color, dpr);
+      for (const p of drawOrder) {
+        if (p.markers.length === 0) continue;
+        ctx.globalAlpha = hasHover ? (p.isHovered ? 1 : 0.28) : p.top ? 1 : 0.78;
+        const sz = p.isHovered ? p.markerSz * 1.18 : p.markerSz;
+        for (const [mx, my] of p.markers) {
+          drawTradeMarkerSprite(ctx, p.st.marker, mx, my, sz, p.isHovered ? '#f6d46b' : p.st.color, dpr);
+        }
       }
       ctx.globalAlpha = 1;
       ctx.restore();
@@ -1410,5 +1481,5 @@ export function renderMapOverlay(ctx: CanvasRenderingContext2D, rc: OverlayRende
     }
   }
 
-  return { banners, points };
+  return { banners, points, routes: routeHits };
 }

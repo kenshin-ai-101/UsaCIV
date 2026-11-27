@@ -6,6 +6,7 @@ import type {
   MineNode,
   PortNode,
   PowerPlantNode,
+  TradeRouteNode,
   WonderNode,
   WorldHexData,
 } from '../types/world';
@@ -18,7 +19,16 @@ export type PickedItem =
   | { kind: 'port'; port: PortNode }
   | { kind: 'airport'; airport: AirportNode }
   | { kind: 'military'; base: MilitaryBaseNode }
+  | { kind: 'route'; route: TradeRouteNode }
   | { kind: 'hex'; hexId: number };
+
+export interface RouteHitItem {
+  route: TradeRouteNode;
+  pts: number[];
+  bbox: [number, number, number, number];
+  tolPx: number;
+  markers: [number, number, number][];
+}
 
 export interface BannerHitBox {
   city: CityRecord;
@@ -90,6 +100,14 @@ export class HexSpatialIndex {
   }
 }
 
+function segDistPx(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const l2 = dx * dx + dy * dy;
+  const t = l2 > 0 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2)) : 0;
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
 export function hitTestScreen(
   sx: number,
   sy: number,
@@ -98,6 +116,7 @@ export function hitTestScreen(
   bannerBoxes: BannerHitBox[],
   pointHits: PointHitItem[],
   hexIndex: HexSpatialIndex | null,
+  routeHits: RouteHitItem[] = [],
 ): PickedItem | null {
   // 1. Top priority: City Railway-Plaque Banners
   for (let i = bannerBoxes.length - 1; i >= 0; i--) {
@@ -119,7 +138,33 @@ export function hitTestScreen(
   }
   if (bestPt) return bestPt.item;
 
-  // 3. Underlying 25 km Hex Tile
+  // 3. Interstate Freight Trade Routes (vehicle medallions first, then nearest quadratic arc)
+  if (routeHits.length > 0) {
+    let bestRoute: TradeRouteNode | null = null;
+    let bestDist = Infinity;
+    for (let i = 0; i < routeHits.length; i++) {
+      const rh = routeHits[i];
+      const [x0, y0, x1, y1] = rh.bbox;
+      const pad = rh.tolPx + 14;
+      if (sx < x0 - pad || sx > x1 + pad || sy < y0 - pad || sy > y1 + pad) continue;
+      for (const [mx, my, mr] of rh.markers) {
+        if (Math.hypot(sx - mx, sy - my) <= mr + 3) {
+          return { kind: 'route', route: rh.route };
+        }
+      }
+      const p = rh.pts;
+      for (let k = 2; k < p.length; k += 2) {
+        const d = segDistPx(sx, sy, p[k - 2], p[k - 1], p[k], p[k + 1]);
+        if (d <= rh.tolPx && d < bestDist) {
+          bestDist = d;
+          bestRoute = rh.route;
+        }
+      }
+    }
+    if (bestRoute) return { kind: 'route', route: bestRoute };
+  }
+
+  // 4. Underlying 25 km Hex Tile
   if (hexIndex) {
     const hid = hexIndex.findHexAtWorld(wx, wy);
     if (hid >= 0) return { kind: 'hex', hexId: hid };
